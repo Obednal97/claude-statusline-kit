@@ -1,0 +1,116 @@
+{
+  "version": 3,
+  "lines": [
+    [
+      {
+        "id": "1",
+        "type": "session-cost",
+        "color": "green"
+      },
+      {
+        "id": "2",
+        "type": "separator"
+      },
+      {
+        "id": "3",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/daily-cost.sh",
+        "color": "yellow",
+        "timeout": 5000
+      },
+      {
+        "id": "4",
+        "type": "separator"
+      },
+      {
+        "id": "12",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/weekly-cost.sh",
+        "color": "yellow",
+        "timeout": 5000
+      },
+      {
+        "id": "13",
+        "type": "separator"
+      },
+      {
+        "id": "14",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/monthly-cost.sh",
+        "color": "yellow",
+        "timeout": 5000
+      }
+    ],
+    [
+      {
+        "id": "7",
+        "type": "model",
+        "color": "magenta"
+      },
+      {
+        "id": "8",
+        "type": "separator"
+      },
+      {
+        "id": "5",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/context-percentage.sh",
+        "color": "cyan",
+        "timeout": 5000
+      },
+      {
+        "id": "15",
+        "type": "separator"
+      },
+      {
+        "id": "16",
+        "type": "session-clock",
+        "color": "blue"
+      }
+    ],
+    [
+      {
+        "id": "9",
+        "type": "git-branch",
+        "color": "brightBlack",
+        "metadata": {
+          "hideNoGit": "true"
+        }
+      },
+      {
+        "id": "10",
+        "type": "separator"
+      },
+      {
+        "id": "17",
+        "type": "git-changes",
+        "color": "brightBlack",
+        "metadata": {
+          "hideNoGit": "true"
+        }
+      }
+    ],
+    [
+      {
+        "id": "18",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/account.sh",
+        "color": "white",
+        "timeout": 5000
+      }
+    ]
+  ],
+  "flexMode": "full-minus-40",
+  "compactThreshold": 80,
+  "colorLevel": 2,
+  "inheritSeparatorColors": false,
+  "globalBold": false,
+  "powerline": {
+    "enabled": false,
+    "separators": [""],
+    "separatorInvertBackground": [false],
+    "startCaps": [],
+    "endCaps": [],
+    "autoAlign": false
+  }
+}
