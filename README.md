@@ -89,9 +89,16 @@ Two kinds of "up to date", handled separately:
 
 Removes the kit's scripts + config and unsets the status line. `ccstatusline`/`ccusage` are left installed; remove them with `npm uninstall -g ccstatusline ccusage` if you want.
 
-## Credits
+## Acknowledgements
 
-Built on [`ccstatusline`](https://github.com/sirmalloc/ccstatusline) by sirmalloc and [`ccusage`](https://github.com/ryoppippi/ccusage) by ryoppippi. This kit is an independent preset and is not affiliated with either project or with Anthropic.
+This kit is a thin preset — the real work is done by these projects, with thanks to their authors and contributors:
+
+- **[ccstatusline](https://github.com/sirmalloc/ccstatusline)** by [@sirmalloc](https://github.com/sirmalloc) — MIT. The Claude Code status-line renderer this kit configures and extends with custom widgets.
+- **[ccusage](https://github.com/ryoppippi/ccusage)** by [@ryoppippi](https://github.com/ryoppippi) — MIT. Reads your local Claude usage and prices it; powers the cost widgets (session / day / week / month).
+- **[LiteLLM](https://github.com/BerriAI/litellm)** by [BerriAI](https://github.com/BerriAI) — MIT. Its public [`model_prices_and_context_window.json`](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json) dataset is the source of live pricing (via ccusage) and the model context-window sizes used to scale the context %.
+- **[Claude Code](https://claude.com/claude-code)** by Anthropic — the tool this status line runs in.
+
+This kit is an independent preset and is not affiliated with or endorsed by any of the above projects.
 
 ## License
 
