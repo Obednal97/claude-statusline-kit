@@ -1,42 +1,47 @@
 #!/usr/bin/env bash
-# Week-to-date cost with 15-minute cache, non-blocking background refresh.
-# Mirrors daily-cost.sh. Uses `ccusage weekly` and takes the LAST bucket
-# (the in-progress current week). No --offline: bundled pricing lags new models.
-CACHE_FILE="/tmp/ccusage-weekly-cost-$(date +%Y%m%d).cache"
-LOCK_FILE="/tmp/ccusage-weekly-cost.lock"
-CACHE_AGE=900  # 15 minutes
+# Week-to-date cost (weeks start Sunday, ccusage default) with 15-minute cache,
+# non-blocking background refresh. Mirrors daily-cost.sh.
+#
+# `ccusage` takes ~10s, longer than ccstatusline's widget timeout, so the
+# refresh ALWAYS runs detached and the render only ever reads the cache.
+# Until the first refresh of the week lands, this prints "Wk: …".
+# No --offline: the bundled price table lags new models, which showed $0.00.
+PREFIX="Wk"
+CACHE_FILE="/tmp/ccusage-weekly-cost-$(id -u)-$(date +%Y-%U).cache"
+LOCK_DIR="/tmp/ccusage-weekly-cost-$(id -u).lockd"
+CACHE_AGE=900   # refresh after 15 minutes
+LOCK_TTL=120    # a lock older than this is from a killed refresh; ignore it
 NODE="$(command -v node)"
 
 refresh_cache() {
-  if [ -f "$LOCK_FILE" ]; then
-    return
+  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    LT=$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null)
+    [ $(( $(date +%s) - ${LT:-0} )) -lt "$LOCK_TTL" ] && return
+    rm -rf "$LOCK_DIR"; mkdir "$LOCK_DIR" 2>/dev/null || return
   fi
-  touch "$LOCK_FILE"
+  trap 'rm -rf "$LOCK_DIR"' EXIT
 
-  COST=""
-  if [ -n "$NODE" ]; then
-    COST=$(ccusage weekly --json 2>/dev/null | "$NODE" -e 'const fs=require("fs");let s="";try{s=fs.readFileSync(0,"utf8")}catch(e){}let o={};try{o=JSON.parse(s)}catch(e){}const a=(o.weekly||[]);const last=a[a.length-1];process.stdout.write(last&&last.totalCost!=null?String(last.totalCost):"")')
+  [ -n "$NODE" ] || return
+  DOW=$(date +%w)   # days since Sunday
+  WEEK_START=$(date -v-"${DOW}"d +%Y%m%d 2>/dev/null || date -d "-${DOW} days" +%Y%m%d)
+  # --since limits output to this period, so the last bucket is the current one
+  # (0 if no usage yet). Prints nothing if ccusage failed,
+  # so a failed run never overwrites a good cached value.
+  COST=$(ccusage weekly --since "$WEEK_START" --json 2>/dev/null | "$NODE" -e 'const fs=require("fs");let o;try{o=JSON.parse(fs.readFileSync(0,"utf8"))}catch(e){process.exit(0)}const a=(o&&o.weekly)||[];const l=a[a.length-1];const c=l&&l.totalCost;process.stdout.write(String(c!=null?c:0))')
+  if [ -n "$COST" ]; then
+    printf "%s: \$%.2f" "$PREFIX" "$COST" > "$CACHE_FILE.tmp" && mv "$CACHE_FILE.tmp" "$CACHE_FILE"
   fi
-
-  if [ -n "$COST" ] && [ "$COST" != "0" ]; then
-    printf "Wk: \$%.2f" "$COST" > "$CACHE_FILE"
-  else
-    echo "Wk: \$0.00" > "$CACHE_FILE"
-  fi
-
-  rm -f "$LOCK_FILE"
 }
 
+STALE=1
 if [ -f "$CACHE_FILE" ]; then
   cat "$CACHE_FILE"
-  CACHE_TIME=$(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null)
-  NOW=$(date +%s)
-  AGE=$((NOW - CACHE_TIME))
-  if [ "$AGE" -ge "$CACHE_AGE" ]; then
-    refresh_cache &
-  fi
-  exit 0
+  CT=$(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null)
+  [ $(( $(date +%s) - ${CT:-0} )) -lt "$CACHE_AGE" ] && STALE=0
+else
+  printf "%s: …" "$PREFIX"
 fi
 
-refresh_cache
-cat "$CACHE_FILE" 2>/dev/null || echo "Wk: \$0.00"
+# detach fds so the background refresh can never stall or be killed with the render
+[ "$STALE" = "1" ] && ( refresh_cache </dev/null >/dev/null 2>&1 & )
+exit 0

@@ -49,7 +49,7 @@ fi
 cp "$REPO_DIR/statusline/"*.sh "$CFG_DIR/"
 chmod +x "$CFG_DIR/"*.sh
 cp "$REPO_DIR/settings.json" "$CFG_DIR/settings.json"
-say "Installed 5 widget scripts + config into $CFG_DIR"
+say "Installed 6 widget scripts + config into $CFG_DIR"
 
 # 3. Point Claude Code at ccstatusline --------------------------------------
 if [ -f "$CLAUDE_SETTINGS" ]; then

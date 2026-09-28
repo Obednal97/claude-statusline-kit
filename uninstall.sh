@@ -11,7 +11,7 @@ CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 
 say() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 
-for f in daily-cost.sh weekly-cost.sh monthly-cost.sh context-percentage.sh account.sh settings.json; do
+for f in daily-cost.sh weekly-cost.sh monthly-cost.sh context-percentage.sh account.sh repo-name.sh settings.json; do
   rm -f "$CFG_DIR/$f"
 done
 say "Removed kit scripts + config from $CFG_DIR"

@@ -70,6 +70,17 @@
     ],
     [
       {
+        "id": "19",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/repo-name.sh",
+        "color": "brightBlack",
+        "timeout": 5000
+      },
+      {
+        "id": "20",
+        "type": "separator"
+      },
+      {
         "id": "9",
         "type": "git-branch",
         "color": "brightBlack",
