@@ -15,7 +15,7 @@ NODE="$(command -v node)"
 
 refresh_cache() {
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    LT=$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null)
+    LT=$(stat -c %Y "$LOCK_DIR" 2>/dev/null || stat -f %m "$LOCK_DIR" 2>/dev/null)
     [ $(( $(date +%s) - ${LT:-0} )) -lt "$LOCK_TTL" ] && return
     rm -rf "$LOCK_DIR"; mkdir "$LOCK_DIR" 2>/dev/null || return
   fi
@@ -36,7 +36,7 @@ refresh_cache() {
 STALE=1
 if [ -f "$CACHE_FILE" ]; then
   cat "$CACHE_FILE"
-  CT=$(stat -f %m "$CACHE_FILE" 2>/dev/null || stat -c %Y "$CACHE_FILE" 2>/dev/null)
+  CT=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || stat -f %m "$CACHE_FILE" 2>/dev/null)
   [ $(( $(date +%s) - ${CT:-0} )) -lt "$CACHE_AGE" ] && STALE=0
 else
   printf "%s: …" "$PREFIX"

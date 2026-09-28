@@ -50,7 +50,7 @@ if [ "$USE_LIVE_WINDOWS" = "1" ]; then
   if [ ! -f "$CACHE" ]; then
     STALE=1
   else
-    CT=$(stat -f %m "$CACHE" 2>/dev/null || stat -c %Y "$CACHE" 2>/dev/null)
+    CT=$(stat -c %Y "$CACHE" 2>/dev/null || stat -f %m "$CACHE" 2>/dev/null)
     [ $(( $(date +%s) - ${CT:-0} )) -ge "$MAX_AGE" ] && STALE=1
   fi
   # detach fds so the background refresh can never stall the render
