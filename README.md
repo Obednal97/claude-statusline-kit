@@ -77,7 +77,7 @@ Two kinds of "up to date", handled separately:
 ## How it works (and privacy)
 
 - Everything runs **locally**. The only network calls are the ones that fetch **public** pricing/model data (via `ccusage` and the LiteLLM model database) — no personal data ever leaves your machine.
-- The account widget reads only your **email/identity** from `~/.claude.json` (`oauthAccount`). It never reads or displays credentials or tokens.
+- The account widget reads only your **email/identity** from the active config (`$CLAUDE_CONFIG_DIR/.claude.json` if set, else `~/.claude.json`; `oauthAccount`). It never reads or displays credentials or tokens.
 - The cost widgets shell out to `ccusage`, which reads your local Claude usage logs and fetches public pricing. `ccusage` takes ~10s, so it always runs in a detached background refresh and the widgets only read a `/tmp` cache (refreshed every 15 minutes). The first render of a new day/week/month shows `…` for a few seconds until the first refresh lands.
 - The context widget reads the current session transcript that Claude Code passes it on stdin, and divides tokens-used by the model's real context window (looked up from the cached model database, with a built-in fallback).
 

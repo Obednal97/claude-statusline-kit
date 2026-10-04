@@ -3,7 +3,8 @@
 # email domain. The account updates whenever you /login, so this reflects the
 # login in use right now.
 #
-# Reads ONLY identity metadata (oauthAccount.emailAddress) from ~/.claude.json.
+# Reads ONLY identity metadata (oauthAccount.emailAddress) from the active
+# config: $CLAUDE_CONFIG_DIR/.claude.json if set, else ~/.claude.json.
 # It never reads or displays the credentials/token file.
 #
 # Output: "👤 you@example.com"
@@ -13,7 +14,8 @@
 #   Leave it empty to just show the email with no tag.
 
 export WORK_DOMAIN=""   # e.g. "acme.com" to label that domain as "Work"
-CONFIG="$HOME/.claude.json"
+export CONFIG="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
+CONFIG="${CONFIG:-$HOME/.claude.json}"
 NODE="$(command -v node)"
 
 if [ -z "$NODE" ] || [ ! -f "$CONFIG" ]; then
@@ -24,7 +26,7 @@ fi
 "$NODE" -e '
 const fs = require("fs");
 let o = {};
-try { o = JSON.parse(fs.readFileSync(process.env.HOME + "/.claude.json", "utf8")); } catch (e) {}
+try { o = JSON.parse(fs.readFileSync(process.env.CONFIG, "utf8")); } catch (e) {}
 const acct = o.oauthAccount || {};
 const email = acct.emailAddress || acct.email || "";
 if (!email) { process.stdout.write("👤 (not logged in)"); process.exit(0); }
