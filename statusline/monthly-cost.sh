@@ -7,8 +7,11 @@
 # Until the first refresh of the month lands, this prints "Mo: …".
 # No --offline: the bundled price table lags new models, which showed $0.00.
 PREFIX="Mo"
-CACHE_FILE="/tmp/ccusage-monthly-cost-$(id -u)-$(date +%Y%m).cache"
-LOCK_DIR="/tmp/ccusage-monthly-cost-$(id -u).lockd"
+# Each config dir ($CLAUDE_CONFIG_DIR) is its own account with its own transcripts,
+# and ccusage only reads the active one, so key the cache per config dir.
+ACCT=$(printf %s "${CLAUDE_CONFIG_DIR:-default}" | cksum | cut -d" " -f1)
+CACHE_FILE="/tmp/ccusage-monthly-cost-$(id -u)-$ACCT-$(date +%Y%m).cache"
+LOCK_DIR="/tmp/ccusage-monthly-cost-$(id -u)-$ACCT.lockd"
 CACHE_AGE=900   # refresh after 15 minutes
 LOCK_TTL=120    # a lock older than this is from a killed refresh; ignore it
 NODE="$(command -v node)"

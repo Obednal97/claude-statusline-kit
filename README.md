@@ -61,6 +61,19 @@ Point Claude Code at this repo and paste:
 - **Change widgets, colours, layout, powerline** — run `ccstatusline` for its interactive editor. Your config lives at `~/.config/ccstatusline/settings.json`.
 - **Turn off the context-window auto-update** — set `USE_LIVE_WINDOWS=0` near the top of `~/.config/ccstatusline/context-percentage.sh` to skip the network fetch and use only the built-in model list.
 
+### Multiple accounts
+
+If you run separate Claude Code accounts (e.g. work and personal) with their own config dirs via `CLAUDE_CONFIG_DIR`, the cost widgets track each one separately: `ccusage` reads only the active config dir's usage, and each dir gets its own cache. Adding another account needs no changes to the kit:
+
+1. Give it its own config dir and launch Claude Code with it, e.g. `CLAUDE_CONFIG_DIR=~/.claude-client claude`.
+2. Point that dir at the status line. `install.sh` only writes `~/.claude/settings.json`, so add this to `<config dir>/settings.json`:
+
+   ```json
+   "statusLine": { "type": "command", "command": "ccstatusline" }
+   ```
+
+Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login. Switching accounts with `/login` inside the same dir keeps a single combined total.
+
 ## Keeping it up to date
 
 Two kinds of "up to date", handled separately:
@@ -78,7 +91,7 @@ Two kinds of "up to date", handled separately:
 
 - Everything runs **locally**. The only network calls are the ones that fetch **public** pricing/model data (via `ccusage` and the LiteLLM model database) — no personal data ever leaves your machine.
 - The account widget reads only your **email/identity** from the active config (`$CLAUDE_CONFIG_DIR/.claude.json` if set, else `~/.claude.json`; `oauthAccount`). It never reads or displays credentials or tokens.
-- The cost widgets shell out to `ccusage`, which reads your local Claude usage logs and fetches public pricing. `ccusage` takes ~10s, so it always runs in a detached background refresh and the widgets only read a `/tmp` cache (refreshed every 15 minutes). The first render of a new day/week/month shows `…` for a few seconds until the first refresh lands.
+- The cost widgets shell out to `ccusage`, which reads your local Claude usage logs and fetches public pricing. `ccusage` takes ~10s, so it always runs in a detached background refresh and the widgets only read a `/tmp` cache (one per config dir, refreshed every 15 minutes). The first render of a new day/week/month shows `…` for a few seconds until the first refresh lands.
 - The context widget reads the current session transcript that Claude Code passes it on stdin, and divides tokens-used by the model's real context window (looked up from the cached model database, with a built-in fallback).
 
 ## Uninstall
