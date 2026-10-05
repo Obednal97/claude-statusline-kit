@@ -6,6 +6,8 @@
 # This resolves the real window per model.
 #
 # Window resolution order:
+#   0. Claude Code's own context_window.context_window_size on stdin (current
+#      versions send it, with current_usage) — authoritative, used when present.
 #   1. LiteLLM's public model DB (max_input_tokens) — cached locally, refreshed
 #      in the background ~daily. Same community source ccusage uses for pricing,
 #      so windows self-update as new models ship (no reinstall). The fetch NEVER
@@ -15,7 +17,7 @@
 #
 # Set USE_LIVE_WINDOWS=0 below to disable all network access (offline list only).
 #
-# Input: Claude Code's status JSON on stdin (model.id + transcript_path).
+# Input: Claude Code's status JSON on stdin (context_window, or model.id + transcript_path).
 # Output: "Ctx: NN.N% (NNNk)"
 
 USE_LIVE_WINDOWS=1
@@ -64,10 +66,11 @@ try { data = JSON.parse(fs.readFileSync(0, "utf8")); } catch (e) {}
 const modelId = (data && data.model && data.model.id ? String(data.model.id) : "").toLowerCase();
 const is1m = /\[1m\]/.test(modelId);
 
-let windowSize = 0;
+const cw = (data && data.context_window) || {};
+let windowSize = Number(cw.context_window_size) || 0;
 
-// 1. cached LiteLLM window map
-if (process.env.USE_LIVE === "1") {
+// 1. cached LiteLLM window map (only when Claude Code did not report the window)
+if (!windowSize && process.env.USE_LIVE === "1") {
   try {
     const map = JSON.parse(fs.readFileSync(process.env.CACHE, "utf8"));
     const base = modelId.replace(/\[.*$/, "");   // strip a [1m]-style suffix
@@ -77,16 +80,21 @@ if (process.env.USE_LIVE === "1") {
 
 // 2. offline fallback
 if (!windowSize) {
-  const ONE_MILLION = ["claude-fable-5","claude-mythos-5","claude-opus-4-6","claude-opus-4-7","claude-opus-4-8","claude-sonnet-4-6","claude-sonnet-5"];
+  const ONE_MILLION = ["claude-fable-5","claude-mythos-5","claude-opus-4-6","claude-opus-4-7","claude-opus-4-8","claude-opus-5","claude-sonnet-4-6","claude-sonnet-5"];
   windowSize = ONE_MILLION.some(m => modelId.indexOf(m) !== -1) ? 1000000 : 200000;
 }
 // a [1m] suffix always means the 1M beta, whatever the base entry says
-if (is1m) windowSize = 1000000;
+if (is1m && !cw.context_window_size) windowSize = 1000000;
 
-// current context tokens from the transcript (last usage record)
+// current context tokens: Claude Code reports them directly (current_usage);
+// older versions do not, so fall back to the last usage record in the transcript
 let ctx = 0;
+const cu = cw.current_usage;
+if (cu && typeof cu === "object") {
+  ctx = (cu.input_tokens || 0) + (cu.cache_read_input_tokens || 0) + (cu.cache_creation_input_tokens || 0);
+}
 const tpath = data && data.transcript_path;
-if (tpath) {
+if (!ctx && tpath) {
   try {
     const lines = fs.readFileSync(tpath, "utf8").trim().split("\n");
     for (let i = lines.length - 1; i >= 0; i--) {
