@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "lines": [
     [
       {
@@ -39,13 +39,32 @@
         "commandPath": "~/.config/ccstatusline/monthly-cost.sh",
         "color": "yellow",
         "timeout": 5000
+      },
+      {
+        "id": "21",
+        "type": "separator"
+      },
+      {
+        "id": "22",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/plan-usage.sh",
+        "preserveColors": true,
+        "timeout": 5000
       }
     ],
     [
       {
         "id": "7",
         "type": "model",
-        "color": "magenta"
+        "color": "magenta",
+        "merge": true
+      },
+      {
+        "id": "23",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/model-tags.sh",
+        "timeout": 5000,
+        "preserveColors": true
       },
       {
         "id": "8",
@@ -85,7 +104,20 @@
         "type": "git-branch",
         "color": "brightBlack",
         "metadata": {
-          "hideNoGit": "true"
+          "hide": "no-git",
+          "linkToRepo": "true"
+        }
+      },
+      {
+        "id": "24",
+        "type": "separator"
+      },
+      {
+        "id": "25",
+        "type": "git-pr",
+        "color": "brightBlack",
+        "metadata": {
+          "hide": "no-git,no-data,title"
         }
       },
       {
@@ -97,7 +129,7 @@
         "type": "git-changes",
         "color": "brightBlack",
         "metadata": {
-          "hideNoGit": "true"
+          "hide": "no-git"
         }
       }
     ],
@@ -118,8 +150,12 @@
   "globalBold": false,
   "powerline": {
     "enabled": false,
-    "separators": [""],
-    "separatorInvertBackground": [false],
+    "separators": [
+      ""
+    ],
+    "separatorInvertBackground": [
+      false
+    ],
     "startCaps": [],
     "endCaps": [],
     "autoAlign": false
