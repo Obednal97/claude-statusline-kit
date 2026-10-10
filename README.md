@@ -32,7 +32,7 @@ You provide:
 - **[Claude Code](https://claude.com/claude-code)** — this is a status line for it.
 - **Node.js 18+** and **npm** — `ccstatusline`, `ccusage`, and the widget scripts all run on Node.
   Install from [nodejs.org](https://nodejs.org), or `brew install node` (macOS) / your distro's package manager (Linux).
-- **macOS or Linux** with `bash`. On Windows, use WSL.
+- **macOS or Linux** with `bash`, or **Windows** with [Git for Windows](https://git-scm.com/download/win) (Git Bash). WSL works too, if you run Claude Code inside WSL.
 - **`curl`** (optional) — used to self-update context-window sizes. Present by default on macOS and most Linux; if absent, the kit falls back to a built-in model list.
 
 The installer handles the rest:
@@ -49,6 +49,12 @@ cd claude-statusline-kit
 ```
 
 Then open a new Claude Code session (or wait for the next status render). The installer backs up anything it overwrites (`*.bak-<timestamp>`).
+
+### Windows
+
+Install [Node.js](https://nodejs.org) (e.g. `winget install OpenJS.NodeJS.LTS`) and [Git for Windows](https://git-scm.com/download/win), then run the same commands from **Git Bash** (not PowerShell or cmd). Open a new terminal afterwards so Claude Code picks up Node on your PATH.
+
+ccstatusline runs widget commands through `cmd.exe`, which can't run `.sh` scripts, so on Windows the installer rewrites each widget's `commandPath` to launch it with Git Bash, e.g. `"C:/Program Files/Git/bin/bash.exe" "C:/Users/you/.config/ccstatusline/daily-cost.sh"`. If you edit widgets in ccstatusline's interactive editor, keep that form for custom commands.
 
 ### Prefer to let Claude do it?
 

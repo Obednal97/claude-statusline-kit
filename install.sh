@@ -5,7 +5,7 @@
 # - Points Claude Code's status line at `ccstatusline`
 # - Backs up anything it overwrites
 #
-# Safe to re-run. macOS and Linux (bash). Windows: use WSL.
+# Safe to re-run. macOS and Linux (bash). Windows: run from Git Bash (or use WSL).
 
 set -euo pipefail
 
@@ -50,6 +50,28 @@ cp "$REPO_DIR/statusline/"*.sh "$CFG_DIR/"
 chmod +x "$CFG_DIR/"*.sh
 cp "$REPO_DIR/settings.json" "$CFG_DIR/settings.json"
 say "Installed 6 widget scripts + config into $CFG_DIR"
+
+# Windows (Git Bash): ccstatusline runs custom commands through cmd.exe, which
+# can't run a .sh or expand ~, so point each widget at Git Bash explicitly.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    command -v cygpath >/dev/null 2>&1 || die "cygpath not found — run install.sh from Git Bash."
+    # Prefer Git's bin/bash.exe wrapper: it puts /usr/bin (stat, date, cksum) on PATH.
+    BASH_EXE="$(cygpath -m /)bin/bash.exe"
+    [ -f "$BASH_EXE" ] || BASH_EXE="$(cygpath -m "$(command -v bash)")"
+    BASH_EXE="$BASH_EXE" CFG_WIN="$(cygpath -m "$CFG_DIR")" CFG_JSON="$CFG_DIR/settings.json" node -e '
+    const fs = require("fs");
+    const p = process.env.CFG_JSON;
+    const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+    for (const line of cfg.lines || []) for (const w of line) {
+      const m = typeof w.commandPath === "string" && w.commandPath.match(/^~\/\.config\/ccstatusline\/(.+\.sh)$/);
+      if (m) w.commandPath = "\"" + process.env.BASH_EXE + "\" \"" + process.env.CFG_WIN + "/" + m[1] + "\"";
+    }
+    fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n");
+    '
+    say "Windows: widgets run via $BASH_EXE"
+    ;;
+esac
 
 # 3. Point Claude Code at ccstatusline --------------------------------------
 if [ -f "$CLAUDE_SETTINGS" ]; then

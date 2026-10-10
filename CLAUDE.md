@@ -13,6 +13,7 @@ A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.js
 
 - Custom-command output is trimmed, and colour/OSC 8 link escapes are stripped unless the widget has `"preserveColors": true` (then the script sets its own colours).
 - `"merge": true` goes on the widget that joins the *next* one. If the next widget prints nothing, the merge swallows the separator after it, so a merged script should print a bare `\x1b[0m` rather than nothing.
+- On Windows, custom commands run through `cmd.exe`, so `install.sh` rewrites each `~/.config/ccstatusline/*.sh` `commandPath` to `"<Git>/bin/bash.exe" "<abs path>"`. Keep new widget `commandPath`s in the `~/.config/ccstatusline/<name>.sh` form so that rewrite matches them, and keep scripts to tools Git Bash ships (it has `stat -c`, `cksum`, `date -d`, `/tmp`).
 - `hide` metadata is a comma-separated string, e.g. `"hide": "no-git,no-data"`.
 - Git PR/branch-link widgets are built in (`git-pr`, `git-branch` with `"linkToRepo": "true"`); the PR widget fetches via `gh`/`glab` in the background, so it appears one render later.
 
