@@ -13,8 +13,15 @@
 #
 # Input: Claude Code's status JSON on stdin (rate_limits).
 
+# Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
+# /usr/bin (stat, date, cksum) on PATH.
+case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
 export CONFIG="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
-CONFIG="${CONFIG:-$HOME/.claude.json}"
+# Claude Code on Windows keeps .claude.json in %USERPROFILE%, whatever $HOME says.
+HOME_DIR="$HOME"
+case "${OSTYPE:-}" in msys*|cygwin*) HOME_DIR="${USERPROFILE:-$HOME}" ;; esac
+CONFIG="${CONFIG:-$HOME_DIR/.claude.json}"
 NODE="$(command -v node)"
 [ -z "$NODE" ] || [ ! -f "$CONFIG" ] && exit 0
 

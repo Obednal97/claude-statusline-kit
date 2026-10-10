@@ -7,6 +7,10 @@
 #
 # Input: Claude Code's status JSON on stdin (workspace.current_dir / cwd).
 
+# Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
+# /usr/bin (stat, date, cksum) on PATH.
+case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
 NODE="$(command -v node)"
 DIR=""
 if [ -n "$NODE" ]; then

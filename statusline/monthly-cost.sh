@@ -6,6 +6,11 @@
 # refresh ALWAYS runs detached and the render only ever reads the cache.
 # Until the first refresh of the month lands, this prints "Mo: …".
 # No --offline: the bundled price table lags new models, which showed $0.00.
+
+# Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
+# /usr/bin (stat, date, cksum) on PATH.
+case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
 PREFIX="Mo"
 # Each config dir ($CLAUDE_CONFIG_DIR) is its own account with its own transcripts,
 # and ccusage only reads the active one, so key the cache per config dir.

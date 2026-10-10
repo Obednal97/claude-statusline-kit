@@ -32,7 +32,7 @@ You provide:
 - **[Claude Code](https://claude.com/claude-code)** — this is a status line for it.
 - **Node.js 18+** and **npm** — `ccstatusline`, `ccusage`, and the widget scripts all run on Node.
   Install from [nodejs.org](https://nodejs.org), or `brew install node` (macOS) / your distro's package manager (Linux).
-- **macOS or Linux** with `bash`. On Windows, use WSL.
+- **macOS or Linux** with `bash`, or **Windows** with [Git for Windows](https://git-scm.com/download/win) (Git Bash). WSL works too, if you run Claude Code inside WSL.
 - **`curl`** (optional) — used to self-update context-window sizes. Present by default on macOS and most Linux; if absent, the kit falls back to a built-in model list.
 
 The installer handles the rest:
@@ -49,6 +49,18 @@ cd claude-statusline-kit
 ```
 
 Then open a new Claude Code session (or wait for the next status render). The installer backs up anything it overwrites (`*.bak-<timestamp>`).
+
+### Windows
+
+Install [Node.js](https://nodejs.org) (e.g. `winget install OpenJS.NodeJS.LTS`) and [Git for Windows](https://git-scm.com/download/win). Then open a **new** Git Bash window (so it sees Node on PATH) and run the same commands there, not in PowerShell or cmd. MSYS2 and Cygwin shells work too. Restart Claude Code afterwards so it picks up Node as well.
+
+What's different on Windows:
+
+- **Widgets launch through bash.exe.** ccstatusline runs widget commands through `cmd.exe`, which can't run `.sh` scripts, so the installer rewrites each widget's `commandPath` to an absolute bash call, e.g. `"C:/Program Files/Git/bin/bash.exe" "C:/Users/you/.config/ccstatusline/daily-cost.sh"`. If you add custom commands in ccstatusline's interactive editor, use the same form.
+- **Files go under `%USERPROFILE%`.** Node, ccstatusline and Claude Code ignore `$HOME` on Windows, so the installer uses `%USERPROFILE%\.config\ccstatusline` and `%USERPROFILE%\.claude\settings.json`, even if your shell's `$HOME` points somewhere else (e.g. Cygwin's `/home/you`).
+- **Renders are slower.** Each widget starts `bash.exe` and Node, which is slow on Windows, so a full render takes roughly 2–3 seconds instead of a fraction of one. Cost data is unaffected: it is always read from the background cache.
+
+Running Claude Code inside WSL instead? Run `./install.sh` inside WSL. It sets up the Linux side as on any Linux machine.
 
 ### Prefer to let Claude do it?
 
