@@ -20,6 +20,10 @@
 # Input: Claude Code's status JSON on stdin (context_window, or model.id + transcript_path).
 # Output: "Ctx: NN.N% (NNNk)"
 
+# Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
+# /usr/bin (stat, date, cksum) on PATH.
+case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
 USE_LIVE_WINDOWS=1
 LITELLM_URL="https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 CACHE="/tmp/ccstatusline-model-windows-$(id -u).json"

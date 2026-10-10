@@ -13,9 +13,16 @@
 #     "👤 Personal · you@personal.com"   (any other domain)
 #   Leave it empty to just show the email with no tag.
 
+# Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
+# /usr/bin (stat, date, cksum) on PATH.
+case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
 export WORK_DOMAIN=""   # e.g. "acme.com" to label that domain as "Work"
 export CONFIG="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
-CONFIG="${CONFIG:-$HOME/.claude.json}"
+# Claude Code on Windows keeps .claude.json in %USERPROFILE%, whatever $HOME says.
+HOME_DIR="$HOME"
+case "${OSTYPE:-}" in msys*|cygwin*) HOME_DIR="${USERPROFILE:-$HOME}" ;; esac
+CONFIG="${CONFIG:-$HOME_DIR/.claude.json}"
 NODE="$(command -v node)"
 
 if [ -z "$NODE" ] || [ ! -f "$CONFIG" ]; then

@@ -13,7 +13,15 @@ A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.js
 
 - Custom-command output is trimmed, and colour/OSC 8 link escapes are stripped unless the widget has `"preserveColors": true` (then the script sets its own colours).
 - `"merge": true` goes on the widget that joins the *next* one. If the next widget prints nothing, the merge swallows the separator after it, so a merged script should print a bare `\x1b[0m` rather than nothing.
-- On Windows, custom commands run through `cmd.exe`, so `install.sh` rewrites each `~/.config/ccstatusline/*.sh` `commandPath` to `"<Git>/bin/bash.exe" "<abs path>"`. Keep new widget `commandPath`s in the `~/.config/ccstatusline/<name>.sh` form so that rewrite matches them, and keep scripts to tools Git Bash ships (it has `stat -c`, `cksum`, `date -d`, `/tmp`).
+- On Windows, custom commands run through `cmd.exe`, so `install.sh` rewrites each `~/.config/ccstatusline/*.sh` `commandPath` to `"<bash.exe>" "<abs path>"`. Keep new widget `commandPath`s in the `~/.config/ccstatusline/<name>.sh` form so that rewrite matches them.
+
+## Windows (Git Bash, MSYS2, Cygwin)
+
+- Detect it with `$OSTYPE` (`msys*`/`cygwin*`), backed by `uname -s` (`MINGW*|MSYS*|CYGWIN*|*_NT-*`, which covers MSYS2's UCRT64/CLANG64). WSL reports `linux-gnu` and is treated as Linux, which is correct: Node and Claude Code are Linux there.
+- Node, ccstatusline and Claude Code are native Windows programs: their home is `%USERPROFILE%` (they ignore `$HOME`), and they need `C:/` paths. Pass every path you hand to `node` through `cygpath -m` (`native_path` in the installers). Do not rely on MSYS auto-conversion, which `MSYS_NO_PATHCONV=1` turns off and Cygwin never does.
+- Every widget starts with the `case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH"` preamble: a bash.exe started by cmd.exe (anything but Git's `bin/bash.exe` wrapper) has no coreutils on PATH. Copy it into new widgets. Git Bash ships `stat -c`, `cksum`, `date -d` and `/tmp`.
+- Windows editors save JSON with a BOM. Strip `^\uFEFF` before `JSON.parse` on any file a user may have edited.
+- ccstatusline renders spaces as U+00A0, so normalise them before grepping its output in tests.
 - `hide` metadata is a comma-separated string, e.g. `"hide": "no-git,no-data"`.
 - Git PR/branch-link widgets are built in (`git-pr`, `git-branch` with `"linkToRepo": "true"`); the PR widget fetches via `gh`/`glab` in the background, so it appears one render later.
 
