@@ -186,7 +186,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 - **Terms of service.** Using several subscriptions to get past per-account limits may breach Anthropic's terms, and accounts can be suspended. Keep employer accounts out.
 - **Token exposure.** On token accounts, the token is in the environment of everything `claude` starts: Bash commands, MCP servers and hooks. If something prints the environment, the token ends up in that conversation's transcript.
 - **Options that don't carry over.** `--worktree` and `--teleport` aren't carried over on a switch. A `--settings` of your own overrides rclaude's, which turns rotation off for that session.
-- **Accounts on another profile.** An account on a different profile (e.g. `"config_dir": null`) can't see the other profile's history. It gets a prompt pointing at the previous transcript instead of `--resume`.
+- **Accounts on another profile.** An account with a different `config_dir` (e.g. a second personal folder, `~/.claude-personal-2`) can't see the other profile's history. It gets a prompt pointing at the previous transcript instead of `--resume`.
 - **Claude Code versions.** Checked against Claude Code 2.1.299. Options added later may not carry over when `rclaude` restarts `claude`.
 - **Windows** isn't supported. Use WSL.
 
