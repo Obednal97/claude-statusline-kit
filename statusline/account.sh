@@ -12,6 +12,11 @@
 #     "👤 Work · you@acme.com"   (email at that domain)
 #     "👤 Personal · you@personal.com"   (any other domain)
 #   Leave it empty to just show the email with no tag.
+#
+# Under rclaude (docs/accounts-and-rotation.md), a session running on a
+# `claude setup-token` token doesn't use the profile's saved login, so the
+# widget shows the account rclaude says is running (RCLAUDE_ACCOUNT_EMAIL,
+# else RCLAUDE_ACCOUNT) instead.
 
 # Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
 # /usr/bin (stat, date, cksum) on PATH.
@@ -24,8 +29,12 @@ HOME_DIR="$HOME"
 case "${OSTYPE:-}" in msys*|cygwin*) HOME_DIR="${USERPROFILE:-$HOME}" ;; esac
 CONFIG="${CONFIG:-$HOME_DIR/.claude.json}"
 NODE="$(command -v node)"
+export TOKEN_ACCOUNT=""
+if [ "${RCLAUDE_AUTH:-}" = "token" ]; then
+  TOKEN_ACCOUNT="${RCLAUDE_ACCOUNT_EMAIL:-${RCLAUDE_ACCOUNT:-token}}"
+fi
 
-if [ -z "$NODE" ] || [ ! -f "$CONFIG" ]; then
+if [ -z "$NODE" ] || { [ -z "$TOKEN_ACCOUNT" ] && [ ! -f "$CONFIG" ]; }; then
   printf '👤 (unknown)'
   exit 0
 fi
@@ -35,7 +44,7 @@ const fs = require("fs");
 let o = {};
 try { o = JSON.parse(fs.readFileSync(process.env.CONFIG, "utf8")); } catch (e) {}
 const acct = o.oauthAccount || {};
-const email = acct.emailAddress || acct.email || "";
+const email = process.env.TOKEN_ACCOUNT || acct.emailAddress || acct.email || "";
 if (!email) { process.stdout.write("👤 (not logged in)"); process.exit(0); }
 const workDomain = (process.env.WORK_DOMAIN || "").toLowerCase();
 // With WORK_DOMAIN set, tag the account Work (matching domain) or Personal.

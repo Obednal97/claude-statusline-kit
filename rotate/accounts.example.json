@@ -1,0 +1,7 @@
+{
+  "tiers": [
+    { "name": "main",  "config_dir": "~/.claude-personal", "auth": "login", "email": "you@example.com" },
+    { "name": "spare", "config_dir": "~/.claude-personal", "auth": "token", "email": "you.too@example.com" }
+  ],
+  "min_upswitch_interval_seconds": 120
+}

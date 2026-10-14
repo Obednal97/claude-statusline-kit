@@ -1,6 +1,6 @@
 # Claude Code Statusline Kit
 
-A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.json`) plus custom-command widget scripts (`statusline/*.sh`). `install.sh` copies every `statusline/*.sh` and `settings.json` into `~/.config/ccstatusline/`; add new scripts to the file list in `uninstall.sh`.
+A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.json`) plus custom-command widget scripts (`statusline/*.sh`). `install.sh` copies every `statusline/*.sh` and `settings.json` into `~/.config/ccstatusline/`; add new scripts to the file list in `uninstall.sh`. `rotate/` holds `rclaude`, an optional account-rotation launcher (Python), with its own installer; see the Rotation section.
 
 ## Writing widget scripts
 
@@ -28,3 +28,21 @@ A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.js
 ## Testing
 
 Render against a sandbox instead of the live config: copy `statusline/*.sh` and `settings.json` into `$TMP/home/.config/ccstatusline/`, then `HOME=$TMP/home CLAUDE_CONFIG_DIR=<dir with a test .claude.json> ccstatusline < sample.json`. Under a fake `HOME`, `gh` loses its login — pass `GH_TOKEN=$(gh auth token)` for PR widgets.
+
+## Rotation (`rotate/`)
+
+`rclaude` wraps `claude` and switches accounts on plan limits. User docs: `docs/accounts-and-rotation.md`.
+
+- Python stdlib only, 3.9+; every module starts with `from __future__ import annotations`.
+- Tests, from the repo root: `/usr/bin/python3 -m unittest discover -s rotate/tests -t rotate` (macOS) or `python3 …` (Linux). `rotate/tests/fake_claude.py` stands in for `claude` in the end-to-end tests. CI: `.github/workflows/rotate-tests.yml`.
+- Tokens never go on argv, in logs or in output. The Keychain is written through `security -i` on stdin; the Linux file store (`tokens.py`) is 0600 and replaced in one step.
+- Don't change the formats of `state.json`, switch files or the generated settings without a migration: sessions started from an older checkout share them.
+- Widgets learn about rclaude only through env: `RCLAUDE_ACCOUNT`, `RCLAUDE_AUTH` (`login`/`token`), `RCLAUDE_ACCOUNT_EMAIL`.
+- `rclaude` can be PID 1 in a container, so process-tree code must not treat PID 1 as "no launcher".
+- What the hooks rely on (checked against Claude Code 2.1.299):
+  - `StopFailure` fires for every submitted prompt on a limited account, with `error: "rate_limit"` and the limit text in `last_assistant_message`.
+  - Resuming, with no prompt, a conversation whose last event is the same account's limit opens Claude Code's limit menu and fires only `SessionStart` (`source: "resume"`); `hooks.handle_session_start` covers it.
+  - Login sessions write a `credential_org` attachment after a prompt only when the org changes; token sessions write none.
+  - An in-session `/login` appears in the transcript as a user entry starting `<local-command-stdout>Login successful`.
+  - The status-line JSON has `rate_limits` (after the first API response) but no account identity.
+- `launcher.py`'s option tables mirror `claude --help`; re-check them when Claude Code adds flags or subcommands.

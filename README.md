@@ -4,6 +4,8 @@ A drop-in, multi-row status line for [Claude Code](https://claude.com/claude-cod
 
 It's a preset for [`ccstatusline`](https://github.com/sirmalloc/ccstatusline) plus eight small widget scripts. Costs come from [`ccusage`](https://github.com/ryoppippi/ccusage).
 
+Also included, and optional: a guide to separate work and personal Claude Code profiles, and `rclaude`, which rotates between your personal subscriptions when one hits its usage limit ([details](#work-and-personal-profiles-and-account-rotation)).
+
 ```
 Cost: $6.50 | Day: $18.40 | Wk: $92.10 | Mo: $412.75 | 5h: 62% ↻2h09m | 7d: 41% ↻Fri
 Model: Opus 5.5 · xhigh ⚡fast | Ctx: 24.3% (243k) | Session: 1h 12m
@@ -33,6 +35,7 @@ You provide:
 - **Node.js 18+** and **npm** — `ccstatusline`, `ccusage`, and the widget scripts all run on Node.
   Install from [nodejs.org](https://nodejs.org), or `brew install node` (macOS) / your distro's package manager (Linux).
 - **macOS or Linux** with `bash`, or **Windows** with [Git for Windows](https://git-scm.com/download/win) (Git Bash). WSL works too, if you run Claude Code inside WSL.
+- **Python 3.9+**, only for the optional account rotation. macOS ships it; on Linux, use your package manager.
 - **`curl`** (optional) — used to self-update context-window sizes. Present by default on macOS and most Linux; if absent, the kit falls back to a built-in model list.
 
 The installer handles the rest:
@@ -74,18 +77,29 @@ Point Claude Code at this repo and paste:
 - **Change widgets, colours, layout, powerline** — run `ccstatusline` for its interactive editor. Your config lives at `~/.config/ccstatusline/settings.json`.
 - **Turn off the context-window auto-update** — set `USE_LIVE_WINDOWS=0` near the top of `~/.config/ccstatusline/context-percentage.sh` to skip the network fetch and use only the built-in model list.
 
-### Multiple accounts
+## Work and personal profiles, and account rotation
 
-If you run separate Claude Code accounts (e.g. work and personal) with their own config dirs via `CLAUDE_CONFIG_DIR`, the cost widgets track each one separately: `ccusage` reads only the active config dir's usage, and each dir gets its own cache. Adding another account needs no changes to the kit:
+Claude Code keeps everything for an account (login, history, settings, plugins, memory) in a config dir. Pointing `CLAUDE_CONFIG_DIR` at a second dir gives you a second, fully separate profile, e.g. plain `claude` for work and `claude-personal` for personal projects:
 
-1. Give it its own config dir and launch Claude Code with it, e.g. `CLAUDE_CONFIG_DIR=~/.claude-client claude`.
-2. Point that dir at the status line. `install.sh` only writes `~/.claude/settings.json`, so add this to `<config dir>/settings.json`:
+```bash
+alias claude-personal='CLAUDE_CONFIG_DIR=~/.claude-personal claude'
+```
 
-   ```json
-   "statusLine": { "type": "command", "command": "ccstatusline" }
-   ```
+The status line works in every profile: the cost widgets track each config dir separately, and row 4 shows the account in use. `install.sh` only writes `~/.claude/settings.json`, so add this to `~/.claude-personal/settings.json` (and any other profile):
 
-Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login. Switching accounts with `/login` inside the same dir keeps a single combined total.
+```json
+"statusLine": { "type": "command", "command": "ccstatusline" }
+```
+
+Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login.
+
+**Several personal subscriptions?** The optional `rclaude` launcher in [`rotate/`](rotate/) starts Claude Code on your first account. When that account hits a session or weekly limit, it relaunches the same conversation on the next account, and it moves back up when the higher account resets. macOS and Linux:
+
+```bash
+./rotate/install.sh
+```
+
+Read [the guide](docs/accounts-and-rotation.md) first. It covers both profiles, the rotation setup, day-to-day use, and the risks: using several subscriptions to get past per-account limits may breach Anthropic's terms.
 
 ## Keeping it up to date
 
@@ -98,7 +112,7 @@ Two kinds of "up to date", handled separately:
   ./update.sh          # git pull + re-run install.sh
   ```
 
-  Or manually: `git pull && ./install.sh`. The installer is idempotent and backs up anything it changes.
+  Or manually: `git pull && ./install.sh`. The installer is idempotent and backs up anything it changes. If you installed rotation, `update.sh` refreshes it too.
 
 ## How it works (and privacy)
 
@@ -115,6 +129,8 @@ Two kinds of "up to date", handled separately:
 ```
 
 Removes the kit's scripts + config and unsets the status line. `ccstatusline`/`ccusage` are left installed; remove them with `npm uninstall -g ccstatusline ccusage` if you want.
+
+Rotation has its own uninstaller: `./rotate/uninstall.sh`. It keeps your accounts and tokens and prints how to remove them.
 
 ## Acknowledgements
 

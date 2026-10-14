@@ -2,7 +2,8 @@
 # 5-hour and weekly plan usage for Pro/Max accounts, e.g. "5h: 62% ↻2h10m | 7d: 41% ↻Thu".
 #
 # Shows only when the active account is a personal Pro or Max plan
-# (oauthAccount.organizationType in the active .claude.json). Team, Enterprise
+# (oauthAccount.organizationType in the active .claude.json), or an rclaude
+# token tier (RCLAUDE_AUTH=token, a personal plan by design). Team, Enterprise
 # and API accounts print nothing, so the widget hides itself.
 #
 # Usage comes from Claude Code's own rate_limits on stdin — no network calls,
@@ -30,7 +31,7 @@ const fs = require("fs");
 let acct = {};
 try { acct = JSON.parse(fs.readFileSync(process.env.CONFIG, "utf8")).oauthAccount || {}; } catch (e) {}
 const PERSONAL_PLANS = ["claude_max", "claude_pro"];
-if (!PERSONAL_PLANS.includes(acct.organizationType)) process.exit(0);
+if (process.env.RCLAUDE_AUTH !== "token" && !PERSONAL_PLANS.includes(acct.organizationType)) process.exit(0);
 
 let d = {};
 try { d = JSON.parse(fs.readFileSync(0, "utf8")); } catch (e) {}

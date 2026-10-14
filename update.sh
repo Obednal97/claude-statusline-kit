@@ -22,3 +22,10 @@ fi
 
 echo "==> Re-running installer…"
 ./install.sh
+
+# Rotation (rclaude) is opt-in: refresh it only if it's installed from this checkout.
+ROTATE_ENTRY="$(cd "$REPO_DIR/rotate" && pwd -P)/rclaude"
+if [ -L "$HOME/.local/bin/rclaude" ] && [ "$(readlink "$HOME/.local/bin/rclaude")" = "$ROTATE_ENTRY" ]; then
+  echo "==> Refreshing rclaude…"
+  ./rotate/install.sh
+fi
