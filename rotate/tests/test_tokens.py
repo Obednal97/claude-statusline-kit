@@ -82,6 +82,13 @@ class BackendChoiceTest(unittest.TestCase):
                 mock.patch.object(tokens.sys, "platform", "darwin"):
             self.assertEqual(tokens.token_file(), "/x/t.json")
 
+    def test_override_path_is_expanded_and_absolute(self):
+        # Final review: a quoted "~" or a relative path must not drop a token file into the current project folder.
+        with mock.patch.dict(os.environ, {"RCLAUDE_TOKEN_FILE": "~/t.json", "HOME": "/home/u"}):
+            self.assertEqual(tokens.token_file(), "/home/u/t.json")
+        with mock.patch.dict(os.environ, {"RCLAUDE_TOKEN_FILE": "rel/t.json"}):
+            self.assertEqual(tokens.token_file(), os.path.join(os.getcwd(), "rel", "t.json"))
+
     def test_macos_uses_the_keychain(self):
         with mock.patch.dict(os.environ, env_without_override(), clear=True), \
                 mock.patch.object(tokens.sys, "platform", "darwin"):

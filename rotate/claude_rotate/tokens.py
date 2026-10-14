@@ -33,8 +33,8 @@ def _account() -> str:
 def token_file() -> Optional[str]:
     """The token file in use, or None when tokens live in the macOS Keychain."""
     override = os.environ.get("RCLAUDE_TOKEN_FILE")
-    if override:
-        return override
+    if override:  # expanded like RCLAUDE_CONFIG: a quoted "~" must not land in the current project folder
+        return os.path.abspath(os.path.expanduser(override))
     if sys.platform == "darwin":
         return None
     return os.path.expanduser(DEFAULT_TOKEN_FILE)  # like Claude Code's own Linux login file
