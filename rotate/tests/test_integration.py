@@ -132,6 +132,7 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(second["argv"],
                          ["--settings", settings, "--resume", "s1", LIMIT_PROMPT, "--dangerously-skip-permissions"])
         self.assertEqual(second["env"]["CLAUDE_CODE_OAUTH_TOKEN"], "tok-b")
+        self.assertEqual((first["env"]["RCLAUDE_AUTH"], second["env"]["RCLAUDE_AUTH"]), ("login", "token"))
         self.assertGreater(h.state()["accounts"]["a"]["limited_until"], time.time())
         self.assertEqual(h.state()["launchers"], {})
 

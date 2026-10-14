@@ -45,7 +45,7 @@ DROP_ON_RELAUNCH = frozenset({
     "-w", "--worktree",
 })
 MANAGED_ENV = ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "RCLAUDE_ACCOUNT", "RCLAUDE_PID",
-               "RCLAUDE_INNER_STATUSLINE")
+               "RCLAUDE_INNER_STATUSLINE", "RCLAUDE_AUTH", "RCLAUDE_ACCOUNT_EMAIL")
 LIMIT_PROMPT = ("You were interrupted by a usage limit and are now running on a different account. "
                 "Continue where you left off.")
 
@@ -118,6 +118,8 @@ def build_env(base: Mapping[str, str], tier: Tier, token: Optional[str], launche
         env["RCLAUDE_ACCOUNT"] = tier.name
         env["RCLAUDE_PID"] = str(launcher_pid)
         env["RCLAUDE_INNER_STATUSLINE"] = inner_statusline or ""
+        env["RCLAUDE_AUTH"] = tier.auth  # status-line widgets: token sessions don't use the profile's login
+        env["RCLAUDE_ACCOUNT_EMAIL"] = tier.email or ""
     return env
 
 

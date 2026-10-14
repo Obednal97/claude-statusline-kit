@@ -78,6 +78,19 @@ class BuildEnvTest(unittest.TestCase):
         self.assertEqual((env["RCLAUDE_ACCOUNT"], env["RCLAUDE_PID"], env["RCLAUDE_INNER_STATUSLINE"]),
                          ("b", "77", "ccstatusline"))
 
+    def test_exports_auth_and_email_for_widgets(self):
+        tier = Tier("spare", "/home/x/.claude-personal", "token", "you.too@example.com")
+        env = launcher.build_env(self.BASE, tier, "tok", launcher_pid=77)
+        self.assertEqual((env["RCLAUDE_AUTH"], env["RCLAUDE_ACCOUNT_EMAIL"]), ("token", "you.too@example.com"))
+        env = launcher.build_env(self.BASE, P, None, launcher_pid=77)
+        self.assertEqual((env["RCLAUDE_AUTH"], env["RCLAUDE_ACCOUNT_EMAIL"]), ("login", ""))
+
+    def test_stale_widget_values_are_dropped(self):
+        base = dict(self.BASE, RCLAUDE_AUTH="token", RCLAUDE_ACCOUNT_EMAIL="old@example.com")
+        env = launcher.build_env(base, W, None)
+        self.assertNotIn("RCLAUDE_AUTH", env)
+        self.assertNotIn("RCLAUDE_ACCOUNT_EMAIL", env)
+
     def test_does_not_mutate_base(self):
         base = dict(self.BASE)
         launcher.build_env(base, P, None)
