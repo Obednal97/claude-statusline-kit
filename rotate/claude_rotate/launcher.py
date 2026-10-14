@@ -17,10 +17,10 @@ from .profiles import login_labels, login_mismatch
 from .state import StateStore
 from .status import format_status
 
-# Option arities and subcommands as listed by `claude --help` in Claude Code 2.1.296.
+# Option arities and subcommands as listed by `claude --help` in Claude Code 2.1.299.
 SUBCOMMANDS = frozenset({
-    "agents", "attach", "auth", "auto-mode", "config", "doctor", "gateway", "import", "install", "kill", "logs",
-    "mcp", "migrate-installer", "plugin", "plugins", "purge", "respawn", "rm", "setup-token", "stop",
+    "agents", "attach", "auth", "auto-mode", "doctor", "gateway", "import", "install", "kill", "logs",
+    "mcp", "plugin", "plugins", "purge", "respawn", "rm", "setup-token", "stop",
     "ultrareview", "update", "upgrade",
 })
 PASSTHROUGH_FLAGS = frozenset({"-p", "--print", "--version", "-v", "--help", "-h", "--cloud"})

@@ -19,6 +19,12 @@ class PassthroughTest(unittest.TestCase):
                      ["-p", "hi"], ["--version"], ["--help"], ["agents"], ["plugins", "list"]):
             self.assertTrue(launcher.is_passthrough(args), args)
 
+    def test_config_and_migrate_installer_are_prompts_since_2_1_299(self):
+        # Claude Code 2.1.299 dropped both subcommands, so `rclaude config` starts a rotating session.
+        self.assertFalse(launcher.is_passthrough(["config"]))
+        self.assertFalse(launcher.is_passthrough(["migrate-installer"]))
+        self.assertTrue(launcher.is_passthrough(["mcp", "list"]))
+
     def test_interactive(self):
         for args in ([], ["--dangerously-skip-permissions"], ["fix the auth bug"], ["--model", "auth"]):
             self.assertFalse(launcher.is_passthrough(args), args)
