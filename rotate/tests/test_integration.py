@@ -59,8 +59,8 @@ class Harness:
         if logged_in:  # (email, org) the personal profile is logged into
             self._json(os.path.join(self.personal, ".claude.json"),
                        {"oauthAccount": {"emailAddress": logged_in[0], "organizationUuid": logged_in[1]}})
-        self.keychain = os.path.join(self.tmp, "keychain.json")
-        self._json(self.keychain, {"b": "tok-b"} if tokens is None else tokens)
+        self.token_file = os.path.join(self.tmp, "tokens.json")
+        self._json(self.token_file, {"b": "tok-b"} if tokens is None else tokens)
         if state:
             self._json(os.path.join(self.state_dir, "state.json"), state)
         self.log = os.path.join(self.tmp, "fake.log")
@@ -76,7 +76,7 @@ class Harness:
         return {
             "PATH": os.environ["PATH"], "HOME": self.home, "USER": os.environ.get("USER", "test"),
             "RCLAUDE_CONFIG": self.config, "RCLAUDE_STATE_DIR": self.state_dir,
-            "RCLAUDE_FAKE_KEYCHAIN": self.keychain, "RCLAUDE_CLAUDE_BIN": FAKE, "RCLAUDE_KILL_DELAY": "0.1",
+            "RCLAUDE_TOKEN_FILE": self.token_file, "RCLAUDE_CLAUDE_BIN": FAKE, "RCLAUDE_KILL_DELAY": "0.1",
             "FAKE_CLAUDE_LOG": self.log, "FAKE_CLAUDE_SCRIPT": self.script,
             # Review focus: stray values from the calling shell must not leak into any tier.
             "CLAUDE_CONFIG_DIR": "/stray/config", "CLAUDE_CODE_OAUTH_TOKEN": "stray-token",

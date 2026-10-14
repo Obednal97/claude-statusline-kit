@@ -53,11 +53,11 @@ class CliTest(unittest.TestCase):
 
     def test_add_token_stores_without_echoing(self):
         kc = os.path.join(tempfile.mkdtemp(), "kc.json")
-        code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_FAKE_KEYCHAIN": kc,
+        code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_TOKEN_FILE": kc,
                                                            "RCLAUDE_CONFIG": self.config_file()},
                                       stdin="sk-ant-oat01-secret_VALUE\n")
         self.assertEqual(code, 0, err)
-        self.assertIn("claude-rotate:b", out)
+        self.assertIn(kc + " (as b)", out)
         self.assertNotIn("secret_VALUE", out + err)
         with open(kc) as f:
             self.assertEqual(json.load(f), {"b": "sk-ant-oat01-secret_VALUE"})

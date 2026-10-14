@@ -8,7 +8,7 @@ import sys
 import time
 from typing import List, Optional
 
-from . import hooks, keychain, launcher, statusline
+from . import hooks, launcher, statusline, tokens
 from .config import NAME_RE, ConfigError, load_config
 from .profiles import login_labels
 from .state import StateStore
@@ -66,11 +66,11 @@ def _add_token(args: List[str], store: StateStore) -> int:
         pass
     token = getpass.getpass("Paste the `claude setup-token` token for %s (input hidden): " % name).strip()
     try:
-        keychain.set_token(name, token)
-    except keychain.KeychainError as e:
+        tokens.set_token(name, token)
+    except tokens.TokenStoreError as e:
         print("rclaude: %s" % e, file=sys.stderr)
         return 1
-    print("Saved to Keychain as %s" % keychain.service_name(name))
+    print("Saved to %s" % tokens.describe(name))
     store.log("token stored for %s" % name)
     return 0
 

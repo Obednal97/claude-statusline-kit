@@ -10,7 +10,7 @@ import sys
 import time
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Set, TextIO, Tuple
 
-from . import keychain
+from . import tokens
 from .config import Config, Tier
 from .limits import best_available, pick
 from .profiles import login_labels, login_mismatch
@@ -217,8 +217,8 @@ def resolve_tier(config: Config, accounts: Mapping, now: float, unusable: Set[st
         try:
             token = get_token(tier.name)
             problem = "no token stored"
-        except keychain.KeychainError as e:
-            token, problem = None, "Keychain error: %s" % e
+        except tokens.TokenStoreError as e:
+            token, problem = None, "token store error: %s" % e
         if token:
             return tier, token
         warn("rclaude: skipping %s (%s). Fix: rclaude add-token %s" % (tier.name, problem, tier.name))
@@ -226,7 +226,7 @@ def resolve_tier(config: Config, accounts: Mapping, now: float, unusable: Set[st
 
 
 def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str, claude_bin: str = "claude",
-        get_token: Callable[[str], Optional[str]] = keychain.get_token, now: Callable[[], float] = time.time,
+        get_token: Callable[[str], Optional[str]] = tokens.get_token, now: Callable[[], float] = time.time,
         environ: Optional[Mapping[str, str]] = None, err: Optional[TextIO] = None) -> int:
     environ = os.environ if environ is None else environ
     err = sys.stderr if err is None else err
@@ -243,7 +243,7 @@ def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str,
         if tier.auth == "token":
             try:
                 token = get_token(tier.name)
-            except keychain.KeychainError:
+            except tokens.TokenStoreError:
                 token = None
         return run_child([claude_bin] + list(argv), build_env(environ, tier, token))
     if is_passthrough(argv):
