@@ -139,7 +139,8 @@ class IntegrationTest(unittest.TestCase):
     def test_missing_token_on_the_target_resumes_quietly_on_the_same_account(self):
         # Code review: the hook picks b by state alone, but b's token was never stored and work is limited,
         # so the launcher can only go back to a. It must not claim "now running on a different account".
-        h = Harness(tokens={}, state={"accounts": {"work": {"limited_until": time.time() + 7200}}, "launchers": {}})
+        # work resets in 8 days, later than any clock-time reset in LIMIT_MSG (at most 24h away), so a is the soonest.
+        h = Harness(tokens={}, state={"accounts": {"work": {"limited_until": time.time() + 8 * 86400}}, "launchers": {}})
         code, err, inv = h.run(["--dangerously-skip-permissions"],
                                [[failure("s1"), {"wait_for_term": True}], [{"exit": 0}]])
         self.assertEqual(code, 0, err)
