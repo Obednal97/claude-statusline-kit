@@ -155,6 +155,11 @@ class PlanRelaunchTest(unittest.TestCase):
         self.assertEqual(launcher.plan_relaunch(self.LIMIT, P, T, None),
                          (["--resume", "s1", launcher.LIMIT_PROMPT], None))
 
+    def test_limit_relaunch_on_the_same_account_sends_no_prompt(self):
+        # Code review: the hook's target had no stored token, so the launcher fell back to the limited
+        # account itself. "Now running on a different account" would be false and would hit the limit again.
+        self.assertEqual(launcher.plan_relaunch(self.LIMIT, P, P, None), (["--resume", "s1"], None))
+
     def test_same_profile_rebalance_resumes_quietly(self):
         self.assertEqual(launcher.plan_relaunch(self.REBALANCE, T, P, None), (["--resume", "s1"], None))
 

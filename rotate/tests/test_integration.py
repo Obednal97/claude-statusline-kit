@@ -136,6 +136,18 @@ class IntegrationTest(unittest.TestCase):
         self.assertGreater(h.state()["accounts"]["a"]["limited_until"], time.time())
         self.assertEqual(h.state()["launchers"], {})
 
+    def test_missing_token_on_the_target_resumes_quietly_on_the_same_account(self):
+        # Code review: the hook picks b by state alone, but b's token was never stored and work is limited,
+        # so the launcher can only go back to a. It must not claim "now running on a different account".
+        h = Harness(tokens={}, state={"accounts": {"work": {"limited_until": time.time() + 7200}}, "launchers": {}})
+        code, err, inv = h.run(["--dangerously-skip-permissions"],
+                               [[failure("s1"), {"wait_for_term": True}], [{"exit": 0}]])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(accounts(inv), ["a", "a"])
+        self.assertEqual(exit_codes(inv), [143, 0])
+        self.assertEqual(inv[1]["argv"][2:], ["--resume", "s1", "--dangerously-skip-permissions"])
+        self.assertIn("rclaude add-token b", err)
+
     def test_falls_to_work_with_handoff_when_personal_accounts_are_limited(self):
         h = Harness(state={"accounts": {"a": {"limited_until": time.time() + 3600}}, "launchers": {}})
         code, err, inv = h.run(["--add-dir", "../lib"], [[failure("s1"), {"wait_for_term": True}], [{"exit": 0}]])

@@ -169,7 +169,9 @@ def plan_relaunch(request: dict, from_tier: Tier, to_tier: Tier,
         if not session_id:
             return [], return_session
         args = ["--resume", session_id]
-        if request.get("reason") == "limit":
+        # Only when it's really another account: if the target had no usable token, the launcher falls back to
+        # the limited account itself, and the prompt would be false and hit the limit again.
+        if request.get("reason") == "limit" and from_tier.name != to_tier.name:
             args.append(LIMIT_PROMPT)
         return args, return_session
     handoff = [handoff_prompt(transcript)] if transcript else []
