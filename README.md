@@ -1,5 +1,7 @@
 # Claude Code Statusline Kit
 
+[![rotate-tests](https://github.com/Obednal97/claude-statusline-kit/actions/workflows/rotate-tests.yml/badge.svg)](https://github.com/Obednal97/claude-statusline-kit/actions/workflows/rotate-tests.yml)
+
 A drop-in, multi-row status line for [Claude Code](https://claude.com/claude-code) that shows your **spend, context usage, git state, and which account you're logged in as** — at a glance, on every render.
 
 It's a preset for [`ccstatusline`](https://github.com/sirmalloc/ccstatusline) plus eight small widget scripts. Costs come from [`ccusage`](https://github.com/ryoppippi/ccusage).
@@ -18,7 +20,7 @@ claude-statusline-kit | ⎇ main | PR #42 OPEN | (+14,-3)
 | **1 — Money** | Session cost · today · week-to-date · month-to-date · on Pro/Max plans, 5-hour and weekly plan usage with time to reset (green/yellow/red at 50%/80%). The plan usage is hidden on Team, Enterprise and API accounts. |
 | **2 — Context** | Model with reasoning effort and fast-mode tags · context window used (correct for 1M-context models) with live token count · session duration |
 | **3 — Git** | Repo name · branch (click to open it on GitHub/GitLab) · open PR/MR for the branch (click to open; needs the `gh` or `glab` CLI) · uncommitted changes. Hidden automatically when you're not in a repo. |
-| **4 — Account** | The Claude account currently logged in (updates when you `/login`). Optional Work/Personal tag. |
+| **4 — Account** | The Claude account currently logged in (updates when you `/login`). Under `rclaude`, the account the session is really running on, including token accounts. Optional Work/Personal tag. |
 
 ## Why
 
@@ -26,6 +28,7 @@ claude-statusline-kit | ⎇ main | PR #42 OPEN | (+14,-3)
 - **Real spend, always priced** — the cost widgets fetch live pricing, so brand-new models are priced correctly instead of showing `$0.00`.
 - **Account awareness** — if you switch between a work and a personal Claude login, row 4 tells you which one is active right now, and row 1 adds plan limits only when it's a personal Pro/Max plan.
 - **Clickable git** — Cmd/Ctrl+click the branch or PR to open it in the browser (iTerm2, Kitty, WezTerm, Ghostty and other terminals with OSC 8 link support).
+- **Several subscriptions, one conversation** (optional) — `rclaude` moves a session to your next personal account when one hits its session or weekly limit, and back when it resets. See [account rotation](#work-and-personal-profiles-and-account-rotation).
 
 ## Requirements
 
@@ -91,9 +94,9 @@ The status line works in every profile: the cost widgets track each config dir s
 "statusLine": { "type": "command", "command": "ccstatusline" }
 ```
 
-Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login.
+Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login: switching accounts with `/login` inside the same dir, or rotating between accounts that share a profile, keeps a single combined total.
 
-**Several personal subscriptions?** The optional `rclaude` launcher in [`rotate/`](rotate/) starts Claude Code on your first account. When that account hits a session or weekly limit, it relaunches the same conversation on the next account, and it moves back up when the higher account resets. macOS and Linux:
+**Several personal subscriptions?** The optional `rclaude` launcher (in `rotate/`) starts Claude Code on your first account. When that account hits a session or weekly limit, it relaunches the same conversation on the next account, and it moves back up when the higher account resets. macOS and Linux:
 
 ```bash
 ./rotate/install.sh
@@ -121,6 +124,7 @@ Two kinds of "up to date", handled separately:
 - The account widget reads only your **email/identity** from the active config (`$CLAUDE_CONFIG_DIR/.claude.json` if set, else `~/.claude.json`; `oauthAccount`). It never reads or displays credentials or tokens.
 - The cost widgets shell out to `ccusage`, which reads your local Claude usage logs and fetches public pricing. `ccusage` takes ~10s, so it always runs in a detached background refresh and the widgets only read a `/tmp` cache (one per config dir, refreshed every 15 minutes). The first render of a new day/week/month shows `…` for a few seconds until the first refresh lands.
 - The context widget reads the current session transcript that Claude Code passes it on stdin, and divides tokens-used by the model's real context window (looked up from the cached model database, with a built-in fallback).
+- The optional `rclaude` launcher makes no network calls of its own. Tokens for extra accounts stay in the macOS Keychain (or a file only you can read, on Linux) and reach Claude Code through its environment. Usage, limits and its log live in `~/.local/state/claude-rotate/`.
 
 ## Uninstall
 

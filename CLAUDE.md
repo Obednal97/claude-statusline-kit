@@ -2,6 +2,12 @@
 
 A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.json`) plus custom-command widget scripts (`statusline/*.sh`). `install.sh` copies every `statusline/*.sh` and `settings.json` into `~/.config/ccstatusline/`; add new scripts to the file list in `uninstall.sh`. `rotate/` holds `rclaude`, an optional account-rotation launcher (Python), with its own installer; see the Rotation section.
 
+**This repo is public.** Never commit personal data: real emails, org IDs, employer names, home paths like `/Users/<name>`, Keychain item suffixes or tokens. Examples use `you@example.com`, `you.too@example.com` and `you@work.example`. Before committing, scan the added lines:
+
+```bash
+git diff --cached origin/main -U0 | grep '^+' | grep -inE '@gmail|/Users/|sk-ant-[A-Za-z0-9_-]{40,}' || echo clean
+```
+
 ## Writing widget scripts
 
 - **Prefer Claude Code's stdin JSON over deriving data yourself.** It now carries `context_window` (real window size + current usage), `rate_limits`, `effort`, `fast_mode`, `pr`, `workspace.repo`, `worktree`, `session_name`, etc. Schema: https://code.claude.com/docs/en/statusline. Fall back to transcripts/caches only for older Claude Code versions.
@@ -33,8 +39,11 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
 
 `rclaude` wraps `claude` and switches accounts on plan limits. User docs: `docs/accounts-and-rotation.md`.
 
-- Python stdlib only, 3.9+; every module starts with `from __future__ import annotations`.
-- Tests, from the repo root: `/usr/bin/python3 -m unittest discover -s rotate/tests -t rotate` (macOS) or `python3 …` (Linux). `rotate/tests/fake_claude.py` stands in for `claude` in the end-to-end tests. CI: `.github/workflows/rotate-tests.yml`.
+- Python stdlib only, 3.9+; every module in `rotate/claude_rotate/` that has code starts with `from __future__ import annotations` (tests don't need it).
+- Tests, from the repo root: `/usr/bin/python3 -m unittest discover -s rotate/tests -t rotate` (macOS) or `python3 …` (Linux). `rotate/tests/fake_claude.py` stands in for `claude` in the end-to-end tests. CI: `.github/workflows/rotate-tests.yml` (Ubuntu 3.9/3.12, macOS 3.12).
+  - The end-to-end tests run `rotate/rclaude` through its `#!/usr/bin/env python3` shebang, so they use the first `python3` on PATH, not the interpreter running the suite. To cover macOS's system 3.9, put `/usr/bin` first on PATH. The widget tests likewise use the first `bash` on PATH.
+  - Linux without installing anything: `docker run --rm -v "$PWD":/kit:ro python:3.12-slim bash -c 'cp -r /kit /tmp/kit && cd /tmp/kit && python3 -m unittest discover -s rotate/tests -t rotate'` (the slim image has no `ps` or node; widget tests skip).
+  - Tests must not depend on the local time zone or time of day: limit messages carry clock times (e.g. "resets 3:45pm"), so keep any competing reset far away (days), not hours.
 - Tokens never go on argv, in logs or in output. The Keychain is written through `security -i` on stdin; the Linux file store (`tokens.py`) is 0600 and replaced in one step.
 - Don't change the formats of `state.json`, switch files or the generated settings without a migration: sessions started from an older checkout share them.
 - Widgets learn about rclaude only through env: `RCLAUDE_ACCOUNT`, `RCLAUDE_AUTH` (`login`/`token`), `RCLAUDE_ACCOUNT_EMAIL`.
@@ -46,3 +55,8 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
   - An in-session `/login` appears in the transcript as a user entry starting `<local-command-stdout>Login successful`.
   - The status-line JSON has `rate_limits` (after the first API response) but no account identity.
 - `launcher.py`'s option tables mirror `claude --help`; re-check them when Claude Code adds flags or subcommands.
+- Known gaps (from code review, not yet fixed):
+  - A limit hit within ~1 s of an idle switch-up being queued gets no switch: the pending rebalance blocks the limit request, then backs off because the transcript grew. The next prompt switches normally.
+  - Ctrl+C in the brief gap between two `claude` runs ends `rclaude` with a traceback.
+  - `rclaude status` counts a launcher that died without cleanup until the next state write (`StateStore.read` doesn't prune; `_save` does).
+  - `tokens._write_file` lets `OSError` (e.g. an unwritable folder) surface as a traceback.
