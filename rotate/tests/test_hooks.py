@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from claude_rotate import hooks
 from claude_rotate.config import parse_config
@@ -304,6 +305,13 @@ class KillHelperTest(unittest.TestCase):
             os.kill(grandchild, 15)
             middle.wait()
             middle.stdout.close()
+
+    def test_finds_claude_when_the_launcher_is_pid_1(self):
+        # In a container, rclaude can be the entrypoint (PID 1); claude is then a direct child of PID 1.
+        parents = {500: 400, 400: 1}
+        with mock.patch.object(hooks, "parent_pid", parents.get):
+            self.assertEqual(hooks.find_launcher_child(1, 500), 400)
+            self.assertIsNone(hooks.find_launcher_child(777, 500))
 
     def test_delayed_kill_backs_off_when_the_transcript_grew(self):
         transcript = os.path.join(tempfile.mkdtemp(), "t.jsonl")

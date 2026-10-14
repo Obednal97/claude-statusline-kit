@@ -197,10 +197,10 @@ def find_launcher_child(launcher_pid: int, start_pid: int, max_depth: int = 10) 
     pid = start_pid
     for _ in range(max_depth):
         ppid = parent_pid(pid)
+        if ppid is not None and ppid == launcher_pid:  # checked first: rclaude may be PID 1 in a container
+            return pid
         if ppid is None or ppid <= 1:
             return None
-        if ppid == launcher_pid:
-            return pid
         pid = ppid
     return None
 
