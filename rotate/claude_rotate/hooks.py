@@ -186,8 +186,18 @@ def handle_session_start(payload: dict, env: Mapping[str, str], config: Config, 
     return request
 
 
-def parent_pid(pid: int) -> Optional[int]:
-    proc = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True)
+def parent_pid(pid: int, proc_root: str = "/proc") -> Optional[int]:
+    """pid's parent, from /proc on Linux (minimal images have no ps) or `ps` elsewhere; None if unknown."""
+    try:
+        with open(os.path.join(proc_root, str(pid), "stat")) as f:
+            stat = f.read()
+        return int(stat.rsplit(")", 1)[1].split()[1])  # after "(command name)": state, then ppid
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        proc = subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True, text=True)
+    except OSError:
+        return None
     out = proc.stdout.strip()
     return int(out) if proc.returncode == 0 and out.isdigit() else None
 

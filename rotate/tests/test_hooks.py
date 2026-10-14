@@ -306,6 +306,19 @@ class KillHelperTest(unittest.TestCase):
             middle.wait()
             middle.stdout.close()
 
+    def test_parent_pid_reads_proc_when_there_is_one(self):
+        root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(root, "123"))
+        with open(os.path.join(root, "123", "stat"), "w") as f:
+            f.write("123 (odd ) name) S 45 123 123 0 -1 4194560")  # the command name may hold ")" and spaces
+        with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
+            self.assertEqual(hooks.parent_pid(123, proc_root=root), 45)
+
+    def test_parent_pid_without_proc_or_ps_is_none(self):
+        # Final review: minimal Linux images have no ps (procps); the hook must not fail on it.
+        with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
+            self.assertIsNone(hooks.parent_pid(os.getpid(), proc_root=tempfile.mkdtemp()))
+
     def test_finds_claude_when_the_launcher_is_pid_1(self):
         # In a container, rclaude can be the entrypoint (PID 1); claude is then a direct child of PID 1.
         parents = {500: 400, 400: 1}
