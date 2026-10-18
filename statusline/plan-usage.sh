@@ -10,7 +10,9 @@
 # no token access. Claude Code sends it only after the session's first API
 # response, so the widget is blank until then.
 #
-# Colour: green under 50%, yellow under 80%, red from 80% (per window).
+# Colour: each window fades from green (0%) through yellow (50%) to red (100%).
+# 24-bit colour when COLORTERM says the terminal supports it, else the nearest
+# of the 256 xterm colours.
 #
 # Input: Claude Code's status JSON on stdin (rate_limits).
 
@@ -38,7 +40,18 @@ try { d = JSON.parse(fs.readFileSync(0, "utf8")); } catch (e) {}
 const rl = d.rate_limits || {};
 
 const now = Date.now() / 1000;
-const colour = p => p >= 80 ? "\x1b[31m" : p >= 50 ? "\x1b[33m" : "\x1b[32m";
+// Green at 0%, yellow at 50%, red at 100%, blended in between.
+const STOPS = [[63, 185, 80], [210, 153, 34], [248, 81, 73]];
+const TRUECOLOR = /truecolor|24bit/i.test(process.env.COLORTERM || "");
+function colour(p) {
+  const t = Math.min(Math.max(p, 0), 100) / 50;
+  const i = Math.min(Math.floor(t), 1), f = t - i;
+  const [r, g, b] = STOPS[i].map((c, k) => Math.round(c + (STOPS[i + 1][k] - c) * f));
+  if (TRUECOLOR) return "\x1b[38;2;" + r + ";" + g + ";" + b + "m";
+  // Nearest colour in the xterm 256-colour cube (levels 0, 95, 135, 175, 215, 255).
+  const q = c => c < 48 ? 0 : c < 115 ? 1 : Math.floor((c - 35) / 40);
+  return "\x1b[38;5;" + (16 + 36 * q(r) + 6 * q(g) + q(b)) + "m";
+}
 const RESET = "\x1b[0m";
 const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 

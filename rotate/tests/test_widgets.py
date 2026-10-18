@@ -47,3 +47,17 @@ class WidgetTest(unittest.TestCase):
         out = self.run_widget("plan-usage.sh", {"RCLAUDE_AUTH": "token"}, org_type="claude_team", stdin=RATE)
         self.assertIn("5h: 62%", out)
         self.assertIn("7d: 41%", out)
+
+    def test_plan_usage_colour_fades_from_green_to_red(self):
+        def rgb(pct, env):
+            stdin = json.dumps({"rate_limits": {"five_hour": {"used_percentage": pct}}})
+            return self.run_widget("plan-usage.sh", env, stdin=stdin).split("m", 1)[0]
+        truecolor = {"COLORTERM": "truecolor"}
+        self.assertEqual(rgb(0, truecolor), "\x1b[38;2;63;185;80")
+        self.assertEqual(rgb(50, truecolor), "\x1b[38;2;210;153;34")
+        self.assertEqual(rgb(100, truecolor), "\x1b[38;2;248;81;73")
+        self.assertEqual(rgb(25, truecolor), "\x1b[38;2;137;169;57")
+        self.assertEqual(rgb(140, truecolor), rgb(100, truecolor))
+        # Without COLORTERM it falls back to the 256-colour palette.
+        self.assertEqual(rgb(0, {}), "\x1b[38;5;71")
+        self.assertEqual(rgb(100, {}), "\x1b[38;5;203")

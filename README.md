@@ -17,7 +17,7 @@ claude-statusline-kit | ⎇ main | PR #42 OPEN | (+14,-3)
 
 | Row | Shows |
 |-----|-------|
-| **1 — Money** | Session cost · today · week-to-date · month-to-date · on Pro/Max plans, 5-hour and weekly plan usage with time to reset (green/yellow/red at 50%/80%). The plan usage is hidden on Team, Enterprise and API accounts. |
+| **1 — Money** | Session cost · today · week-to-date · month-to-date · on Pro/Max plans, 5-hour and weekly plan usage with time to reset (each fades from green through yellow to red as it fills). The plan usage is hidden on Team, Enterprise and API accounts. |
 | **2 — Context** | Model with reasoning effort and fast-mode tags · context window used (correct for 1M-context models) with live token count · session duration |
 | **3 — Git** | Repo name · branch (click to open it on GitHub/GitLab) · open PR/MR for the branch (click to open; needs the `gh` or `glab` CLI) · uncommitted changes. Hidden automatically when you're not in a repo. |
 | **4 — Account** | The Claude account currently logged in (updates when you `/login`). Under `rclaude`, the account the session is really running on, including token accounts. Optional Work/Personal tag. |
