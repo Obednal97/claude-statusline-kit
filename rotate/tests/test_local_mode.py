@@ -1,10 +1,15 @@
 """Local-model mode (statusline/local-mode.sh): claude-local and other wrappers
 that point ANTHROPIC_BASE_URL at Ollama or another non-Anthropic server."""
+import glob
+import http.server
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 
 KIT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -40,6 +45,22 @@ PAYLOAD = {
 }
 CLAUDE_PAYLOAD = dict(PAYLOAD, model={"id": "claude-opus-5-5", "display_name": "Opus 5.5"},
                       cost={"total_cost_usd": 6.5})
+
+
+# Local-mode widgets keep caches in /tmp (ccstatusline-local-server-*, ccstatusline-local-speed-*),
+# and rendering with CLAUDE_LOCAL starts a background check of localhost:11434. Remove what the tests add.
+CACHES = "/tmp/ccstatusline-local-*"
+_caches_before = set()
+
+
+def setUpModule():
+    _caches_before.update(glob.glob(CACHES))
+
+
+def tearDownModule():
+    time.sleep(0.5)   # let background checks finish
+    for f in set(glob.glob(CACHES)) - _caches_before:
+        shutil.rmtree(f, ignore_errors=True) if os.path.isdir(f) else os.remove(f)
 
 
 def base_env(extra):
@@ -118,8 +139,9 @@ class LocalWidgetTest(unittest.TestCase):
         del env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"]
         self.assertEqual(self.run_widget("context-percentage.sh", env), "Ctx: 64.1% (21k)")   # of 32768
 
-    def test_session_cost_is_zero(self):
-        self.assertEqual(self.run_widget("session-cost.sh", CLAUDE_LOCAL), "Cost: Local · $0")
+    def test_costs_hidden(self):
+        for name in ["session-cost.sh", "daily-cost.sh", "weekly-cost.sh", "monthly-cost.sh"]:
+            self.assertEqual(self.run_widget(name, CLAUDE_LOCAL), "", name)
 
     def test_plan_usage_hidden(self):
         self.assertEqual(self.run_widget("plan-usage.sh", CLAUDE_LOCAL), "")
@@ -143,9 +165,11 @@ class LocalWidgetTest(unittest.TestCase):
             for name, want in expected.items():
                 self.assertEqual(self.run_widget(name, env, CLAUDE_PAYLOAD), want, (name, env))
             self.assertIn("5h: 62%", self.run_widget("plan-usage.sh", env, CLAUDE_PAYLOAD))
-            for name in ["daily-cost.sh", "model-tags.sh"]:
+            for name in ["daily-cost.sh", "weekly-cost.sh", "monthly-cost.sh", "model-tags.sh"]:
                 self.assertEqual(self.run_widget(name, env, CLAUDE_PAYLOAD),
                                  self.run_widget(name, {}, CLAUDE_PAYLOAD), (name, env))
+            for name in ["local-speed.sh", "local-server.sh"]:
+                self.assertEqual(self.run_widget(name, env, CLAUDE_PAYLOAD), "", (name, env))
 
     def test_model_and_cost_scripts_match_the_built_in_widgets(self):
         # ccstatusline: "Model: " + (display_name ?? id) minus a trailing " (...)"; nothing without a model.
@@ -158,6 +182,175 @@ class LocalWidgetTest(unittest.TestCase):
         for cost, want in [(0, "Cost: $0.00"), (0.004, "Cost: $0.00"), (12.3456, "Cost: $12.35")]:
             self.assertEqual(self.run_widget("session-cost.sh", {}, {"cost": {"total_cost_usd": cost}}), want)
         self.assertEqual(self.run_widget("session-cost.sh", {}, {}), "")
+
+
+def entry(kind, ts, **message):
+    e = {"type": kind, "timestamp": "2026-10-22T10:%s.000Z" % ts}
+    if message:
+        e["message"] = message
+    return json.dumps(e) + "\n"
+
+
+@unittest.skipUnless(shutil.which("node") and shutil.which("bash"), "needs node and bash")
+class LocalSpeedTest(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.transcript = os.path.join(self.dir, "session.jsonl")
+        self.addCleanup(shutil.rmtree, self.dir)
+
+    def write(self, *lines):
+        with open(self.transcript, "a") as f:
+            f.writelines(lines)
+
+    def speed(self, env=CLAUDE_LOCAL):
+        p = subprocess.run(["bash", os.path.join(WIDGETS, "local-speed.sh")], env=base_env(env),
+                           input=json.dumps({"transcript_path": self.transcript}),
+                           capture_output=True, text=True, timeout=30)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout
+
+    def test_session_average_and_last_reply(self):
+        self.write(entry("user", "00:00"),
+                   # one reply in two content blocks, 0s to 10s, 200 tokens
+                   entry("assistant", "00:05", id="m1", usage={"output_tokens": 200}),
+                   entry("assistant", "00:10", id="m1", usage={"output_tokens": 200}),
+                   entry("user", "00:11"),
+                   entry("api-request", "00:12"),
+                   # 12s to 23s, 412 tokens
+                   entry("assistant", "00:23", id="m2", usage={"output_tokens": 412}))
+        self.assertEqual(self.speed(), "⚡ 29 tok/s · last 412 tok in 11s")   # 612 tok / 21s
+        # new lines are picked up on the next render
+        self.write(entry("user", "01:00"), entry("assistant", "01:02", id="m3", usage={"output_tokens": 5}))
+        self.assertEqual(self.speed(), "⚡ 27 tok/s · last 5 tok in 2.0s")    # 617 tok / 23s
+
+    def test_long_replies_and_slow_rates(self):
+        self.write(entry("user", "00:00"), entry("assistant", "01:30", id="m1", usage={"output_tokens": 1234}))
+        self.assertEqual(self.speed(), "⚡ 14 tok/s · last 1.2k tok in 1m 30s")
+        self.write(entry("user", "02:00"), entry("assistant", "04:00", id="m2", usage={"output_tokens": 66}))
+        self.assertEqual(self.speed(), "⚡ 6.2 tok/s · last 66 tok in 2m 0s")   # 1300 tok / 210s
+
+    def test_subagents_and_half_written_lines_are_skipped(self):
+        side = json.loads(entry("assistant", "00:02", id="s1", usage={"output_tokens": 9999}))
+        side["isSidechain"] = True
+        self.write(entry("user", "00:00"), json.dumps(side) + "\n",
+                   entry("assistant", "00:04", id="m1", usage={"output_tokens": 40}),
+                   '{"type":"assistant","timestamp":"2026-10-22T10:00:09.000Z","mess')
+        self.assertEqual(self.speed(), "⚡ 10 tok/s · last 40 tok in 4.0s")
+
+    def test_nothing_before_the_first_reply_or_outside_local_mode(self):
+        self.write(entry("user", "00:00"))
+        self.assertEqual(self.speed(), "")
+        self.write(entry("assistant", "00:04", id="m1", usage={"output_tokens": 40}))
+        self.assertEqual(self.speed({}), "")
+
+
+class FakeOllama:
+    """Answers GET /api/ps like Ollama, with whatever self.models holds."""
+
+    def __init__(self, models):
+        self.models = models
+        fake = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps({"models": fake.models}).encode()
+                self.send_response(200 if self.path == "/api/ps" else 404)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        self.url = "http://127.0.0.1:%d" % self.server.server_port
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+QWEN = {"name": "qwen3.8:27b-mxfp8", "model": "qwen3.8:27b-mxfp8", "size": 18_400_000_000,
+        "size_vram": 18_400_000_000, "context_length": 65536}
+
+
+@unittest.skipUnless(shutil.which("node") and shutil.which("bash") and shutil.which("curl"),
+                     "needs node, bash and curl")
+class LocalServerTest(unittest.TestCase):
+    def setUp(self):
+        self.ollama = FakeOllama([QWEN])
+        self.addCleanup(self.ollama.close)
+        self.env = dict(CLAUDE_LOCAL, ANTHROPIC_BASE_URL=self.ollama.url)
+        self.addCleanup(self.remove_cache)
+
+    def cache(self):
+        p = subprocess.run(["bash", "-c", '. "$1" && local_server_cache', "_", os.path.join(WIDGETS, "local-mode.sh")],
+                           env=dict(os.environ, **self.env), capture_output=True, text=True)
+        return p.stdout
+
+    def remove_cache(self):
+        path = self.cache()
+        for f in [path, path + ".tmp"]:
+            if os.path.exists(f):
+                os.remove(f)
+        shutil.rmtree(path + ".lockd", ignore_errors=True)
+
+    def widget(self, name="local-server.sh", stdin=PAYLOAD):
+        p = subprocess.run(["bash", os.path.join(WIDGETS, name)], env=base_env(self.env),
+                           input=json.dumps(stdin), capture_output=True, text=True, timeout=30)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout
+
+    def refreshed(self, name="local-server.sh"):
+        """Render once to start the background refresh, wait for it, render again."""
+        self.remove_cache()
+        first = self.widget(name)
+        if name == "local-server.sh":
+            self.assertEqual(first, "")   # nothing until the refresh lands
+        deadline = time.time() + 10
+        while not os.path.exists(self.cache()) and time.time() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(os.path.exists(self.cache()), "background refresh never wrote the cache")
+        return self.widget(name)
+
+    def plain(self, out):
+        return re.sub("\x1b\\[[0-9;]*m", "", out)
+
+    def test_loaded_on_gpu(self):
+        out = self.refreshed()
+        self.assertEqual(self.plain(out), "🧠 100% GPU · 18 GB · 64K ctx")
+        self.assertIn("\x1b[32m100% GPU", out)   # green
+
+    def test_partly_and_fully_on_cpu(self):
+        self.ollama.models = [dict(QWEN, size_vram=11_408_000_000)]
+        out = self.refreshed()
+        self.assertEqual(self.plain(out), "🧠 62% GPU · 18 GB · 64K ctx")
+        self.assertIn("\x1b[33m62% GPU", out)    # yellow
+        self.ollama.models = [dict(QWEN, size_vram=0, size=4_700_000_000, context_length=0)]
+        self.assertEqual(self.plain(self.refreshed()), "🧠 CPU · 4.7 GB")
+
+    def test_not_loaded_and_latest_tag(self):
+        self.ollama.models = [dict(QWEN, name="llama3.1:8b", model="llama3.1:8b")]
+        self.assertEqual(self.plain(self.refreshed()), "🧠 not loaded")
+        self.env["ANTHROPIC_MODEL"] = "mistral"
+        self.ollama.models = [dict(QWEN, name="mistral:latest", model="mistral:latest")]
+        self.assertEqual(self.plain(self.refreshed()), "🧠 100% GPU · 18 GB · 64K ctx")
+
+    def test_server_down(self):
+        self.ollama.close()
+        self.assertEqual(self.plain(self.refreshed()), "🧠 Ollama not responding")
+
+    def test_context_uses_the_served_window(self):
+        self.ollama.models = [dict(QWEN, context_length=32768)]
+        # the served 32K wins over CLAUDE_CODE_MAX_CONTEXT_TOKENS=65536
+        self.assertEqual(self.refreshed("context-percentage.sh"), "Ctx: 64.1% (21k)")
+
+    def test_only_for_ollama_endpoints(self):
+        self.env.pop("ANTHROPIC_AUTH_TOKEN")   # a non-11434 port without the ollama token
+        self.assertEqual(self.widget(), "")
+        time.sleep(0.3)
+        self.assertFalse(os.path.exists(self.cache()))
 
 
 @unittest.skipUnless(shutil.which("node") and shutil.which("bash") and shutil.which("ccstatusline"),
@@ -180,16 +373,26 @@ class PresetRenderTest(unittest.TestCase):
         return p.stdout
 
     def presets(self):
+        """The kit preset, and the same preset as it was before local mode: built-in model and
+        session-cost widgets, and no local-speed/local-server widgets (or their separators)."""
         with open(os.path.join(KIT, "settings.json")) as f:
             new = json.load(f)
         old = json.loads(json.dumps(new))
         builtin = {"model.sh": "model", "session-cost.sh": "session-cost"}
-        for line in old["lines"]:
+        local_only = {"local-speed.sh", "local-server.sh"}
+        for i, line in enumerate(old["lines"]):
+            kept = []
             for w in line:
                 name = os.path.basename(w.get("commandPath", ""))
+                if name in local_only:
+                    if kept and kept[-1]["type"] == "separator":
+                        kept.pop()
+                    continue
                 if name in builtin:
                     w["type"] = builtin[name]
                     del w["commandPath"], w["timeout"]
+                kept.append(w)
+            old["lines"][i] = kept
         return old, new
 
     def test_unchanged_outside_local_mode(self):
@@ -204,7 +407,8 @@ class PresetRenderTest(unittest.TestCase):
     def test_local_render(self):
         _, new = self.presets()
         out = self.render(new, PAYLOAD, CLAUDE_LOCAL).replace(" ", " ")
-        self.assertIn("Cost: Local · $0", out)
+        for gone in ["Cost:", "Day:", "Wk:", "Mo:", "5h:"]:
+            self.assertNotIn(gone, out)
         self.assertIn("Model: Local · qwen3.8 27B", out)
         self.assertIn("Ctx: 32.0% (21k)", out)
         self.assertIn("🖥 Local model (Ollama) · not using your Claude account", out)

@@ -17,9 +17,10 @@
 #
 # Local mode (local-mode.sh: ANTHROPIC_BASE_URL is not Anthropic, e.g.
 # claude-local on Ollama): the window Claude Code reports assumes a Claude
-# model, so it is ignored. The window is CLAUDE_CODE_MAX_CONTEXT_TOKENS, else
-# the cached model DB entry for ANTHROPIC_MODEL (as-is or ollama/-prefixed),
-# else LOCAL_DEFAULT_WINDOW below. The token count is read as usual. The
+# model, so it is ignored. The window is the context length Ollama reports for
+# the loaded model (local-mode.sh caches it from /api/ps in the background),
+# else CLAUDE_CODE_MAX_CONTEXT_TOKENS, else the cached model DB entry for
+# ANTHROPIC_MODEL (as-is or ollama/-prefixed), else LOCAL_DEFAULT_WINDOW below. The token count is read as usual. The
 # background DB refresh is skipped when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
 # is set.
 #
@@ -33,8 +34,8 @@
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
 
 . "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
-export LOCAL=0
-is_local_mode && LOCAL=1
+export LOCAL=0 SERVER_JSON=""
+is_local_mode && LOCAL=1 && SERVER_JSON="$(local_server_json)"
 
 USE_LIVE_WINDOWS=1
 LITELLM_URL="https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -87,8 +88,12 @@ const cw = (data && data.context_window) || {};
 const LOCAL = process.env.LOCAL === "1";
 let windowSize = LOCAL ? localWindow() : (Number(cw.context_window_size) || 0);
 
-// local mode: CLAUDE_CODE_MAX_CONTEXT_TOKENS, else the cached model DB, else a default
+// local mode: what Ollama serves, else CLAUDE_CODE_MAX_CONTEXT_TOKENS, else the cached model DB, else a default
 function localWindow() {
+  try {
+    const s = JSON.parse(process.env.SERVER_JSON);
+    if (s.state === "loaded" && s.ctx > 0) return s.ctx;
+  } catch (e) {}
   const env = Number(process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS);
   if (env > 0) return Math.floor(env);
   const id = String(process.env.ANTHROPIC_MODEL || modelId).toLowerCase();

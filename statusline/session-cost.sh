@@ -5,9 +5,10 @@
 # prints: "Cost: $" + cost.total_cost_usd to 2 decimals, and nothing when
 # Claude Code sends no cost.
 #
-# In local mode (local-mode.sh: ANTHROPIC_BASE_URL is not Anthropic, e.g.
-# claude-local on Ollama) it prints "Cost: Local · $0": a local model is free,
-# and the figure Claude Code sends would be priced as if it were Claude.
+# Hidden in local mode (local-mode.sh: ANTHROPIC_BASE_URL is not Anthropic,
+# e.g. claude-local on Ollama): a local model is free, and the figure Claude
+# Code sends would be priced as if it were Claude. local-speed.sh and
+# local-server.sh take over the row.
 #
 # Input: Claude Code's status JSON on stdin (cost.total_cost_usd).
 
@@ -16,10 +17,7 @@
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
 
 . "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
-if is_local_mode; then
-  printf 'Cost: Local · $0'
-  exit 0
-fi
+is_local_mode && exit 0
 
 NODE="$(command -v node)"
 [ -z "$NODE" ] && exit 0
