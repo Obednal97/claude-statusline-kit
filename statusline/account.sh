@@ -17,10 +17,24 @@
 # `claude setup-token` token doesn't use the profile's saved login, so the
 # widget shows the account rclaude says is running (RCLAUDE_ACCOUNT_EMAIL,
 # else RCLAUDE_ACCOUNT) instead.
+#
+# In local mode (local-mode.sh, e.g. claude-local on Ollama) nothing goes to
+# Anthropic, so it shows "🖥 Local model (Ollama) · not using your Claude
+# account" and never an email.
 
 # Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
 # /usr/bin (stat, date, cksum) on PATH.
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
+. "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
+if is_local_mode; then
+  if local_mode_ollama; then
+    printf '🖥 Local model (Ollama) · not using your Claude account'
+  else
+    printf '🖥 Local model · not using your Claude account'
+  fi
+  exit 0
+fi
 
 export WORK_DOMAIN=""   # e.g. "acme.com" to label that domain as "Work"
 export CONFIG="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"

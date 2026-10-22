@@ -4,8 +4,10 @@
     [
       {
         "id": "1",
-        "type": "session-cost",
-        "color": "green"
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/session-cost.sh",
+        "color": "green",
+        "timeout": 5000
       },
       {
         "id": "2",
@@ -55,8 +57,10 @@
     [
       {
         "id": "7",
-        "type": "model",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/model.sh",
         "color": "magenta",
+        "timeout": 5000,
         "merge": true
       },
       {
