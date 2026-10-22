@@ -4,7 +4,7 @@
 
 A drop-in, multi-row status line for [Claude Code](https://claude.com/claude-code) that shows your **spend, context usage, git state, and which account you're logged in as** — at a glance, on every render.
 
-It's a preset for [`ccstatusline`](https://github.com/sirmalloc/ccstatusline) plus eight small widget scripts. Costs come from [`ccusage`](https://github.com/ryoppippi/ccusage).
+It's a preset for [`ccstatusline`](https://github.com/sirmalloc/ccstatusline) plus twelve small widget scripts. Costs come from [`ccusage`](https://github.com/ryoppippi/ccusage).
 
 Also included, and optional: a guide to separate work and personal Claude Code profiles, and `rclaude`, which rotates between your personal subscriptions when one hits its usage limit ([details](#work-and-personal-profiles-and-account-rotation)).
 
@@ -21,6 +21,8 @@ claude-statusline-kit | ⎇ main | PR #42 OPEN | (+14,-3)
 | **2 — Context** | Model with reasoning effort and fast-mode tags · context window used (correct for 1M-context models) with live token count · session duration |
 | **3 — Git** | Repo name · branch (click to open it on GitHub/GitLab) · open PR/MR for the branch (click to open; needs the `gh` or `glab` CLI) · uncommitted changes. Hidden automatically when you're not in a repo. |
 | **4 — Account** | The Claude account currently logged in (updates when you `/login`). Under `rclaude`, the account the session is really running on, including token accounts. Optional Work/Personal tag. |
+
+On a local model (Ollama and the like), rows 1, 2 and 4 switch to a local view, with speed and GPU stats in place of costs: see [Using a local model](#using-a-local-model-claude-local--ollama).
 
 ## Why
 
@@ -103,6 +105,33 @@ Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Co
 ```
 
 Read [the guide](docs/accounts-and-rotation.md) first. It covers both profiles, the rotation setup, day-to-day use, and the risks: using several subscriptions to get past per-account limits may breach Anthropic's terms.
+
+## Using a local model (claude-local / Ollama)
+
+If you run Claude Code against a local model, for example with a `claude-local` wrapper that points it at [Ollama](https://ollama.com):
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:11434
+export ANTHROPIC_AUTH_TOKEN=ollama
+export ANTHROPIC_MODEL=qwen3.8:27b-mxfp8
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS=65536   # match the context length Ollama serves
+```
+
+the status line notices and switches to a local view:
+
+```
+⚡ 38 tok/s · last 412 tok in 11s | 🧠 100% GPU · 18 GB · 64K ctx
+Model: Local · qwen3.8 27B | Ctx: 12.4% (8k) | Session: 12m
+🖥 Local model (Ollama) · not using your Claude account
+```
+
+- **Detection** — local mode is on whenever `ANTHROPIC_BASE_URL` points anywhere other than `anthropic.com`: `localhost`, `127.0.0.1`, `::1`, a `*.local` or LAN machine, or any other server. Without `ANTHROPIC_BASE_URL` (normal `claude`), nothing changes. Behind a proxy that forwards to Anthropic, set `STATUSLINE_LOCAL_MODE=0` to keep the normal view; `STATUSLINE_LOCAL_MODE=1` forces the local view.
+- **Row 1** — costs and the 5h/7d plan usage are hidden (a local model is free and has no plan limits). In their place:
+  - **Speed** — output tokens per second over the session, and the latest reply's tokens and time, worked out from the session transcript. The times include prompt processing, so on a long context this reads lower than Ollama's own "eval rate": it is the speed you actually wait on. Works with any local server.
+  - **Server** (Ollama only) — how much of the model sits on the GPU, the memory it uses and the context length it was loaded with, from Ollama's `/api/ps`. Anything under 100% GPU turns yellow (part of the model runs on the CPU, so expect it to be slow), and `CPU` red. `not loaded` means the next prompt waits for the model to load; `Ollama not responding` means the server is down. The check runs in the background every ~10 seconds and never delays a render, so it appears one render after a session starts. Ollama counts as port 11434 or `ANTHROPIC_AUTH_TOKEN=ollama`.
+- **Row 2** — the model shows as `Local ·` plus a short name from `ANTHROPIC_MODEL` (`qwen3.8:27b-mxfp8` → `qwen3.8 27B`). Context % ignores the window Claude Code reports (it assumes a Claude model) and uses the context length Ollama loaded the model with, else `CLAUDE_CODE_MAX_CONTEXT_TOKENS`, else the model database, else 32k (`LOCAL_DEFAULT_WINDOW` in `context-percentage.sh`). The token count stays live.
+- **Row 4** — shows that the session is not using your Claude account, never an email.
+- With `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set, the local view also skips the background model-database refresh (the Ollama check still runs: it only talks to your own server).
 
 ## Keeping it up to date
 

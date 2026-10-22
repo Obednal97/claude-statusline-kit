@@ -14,11 +14,17 @@
 # 24-bit colour when COLORTERM says the terminal supports it, else the nearest
 # of the 256 xterm colours.
 #
+# Hidden in local mode (local-mode.sh, e.g. claude-local on Ollama): a local
+# model has no plan limits.
+#
 # Input: Claude Code's status JSON on stdin (rate_limits).
 
 # Windows (Git Bash, MSYS2, Cygwin): bash.exe launched by cmd.exe may not have
 # /usr/bin (stat, date, cksum) on PATH.
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
+
+. "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
+is_local_mode && exit 0
 
 export CONFIG="${CLAUDE_CONFIG_DIR:+$CLAUDE_CONFIG_DIR/.claude.json}"
 # Claude Code on Windows keeps .claude.json in %USERPROFILE%, whatever $HOME says.

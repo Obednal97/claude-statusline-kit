@@ -11,6 +11,11 @@
 # /usr/bin (stat, date, cksum) on PATH.
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
 
+# Hidden in local mode (local-mode.sh, e.g. claude-local on Ollama): the row
+# shows the local model's speed instead.
+. "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
+is_local_mode && exit 0
+
 PREFIX="Mo"
 # Each config dir ($CLAUDE_CONFIG_DIR) is its own account with its own transcripts,
 # and ccusage only reads the active one, so key the cache per config dir.

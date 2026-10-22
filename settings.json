@@ -4,8 +4,10 @@
     [
       {
         "id": "1",
-        "type": "session-cost",
-        "color": "green"
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/session-cost.sh",
+        "color": "green",
+        "timeout": 5000
       },
       {
         "id": "2",
@@ -50,13 +52,37 @@
         "commandPath": "~/.config/ccstatusline/plan-usage.sh",
         "preserveColors": true,
         "timeout": 5000
+      },
+      {
+        "id": "26",
+        "type": "separator"
+      },
+      {
+        "id": "27",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/local-speed.sh",
+        "color": "green",
+        "timeout": 5000
+      },
+      {
+        "id": "28",
+        "type": "separator"
+      },
+      {
+        "id": "29",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/local-server.sh",
+        "preserveColors": true,
+        "timeout": 5000
       }
     ],
     [
       {
         "id": "7",
-        "type": "model",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/model.sh",
         "color": "magenta",
+        "timeout": 5000,
         "merge": true
       },
       {

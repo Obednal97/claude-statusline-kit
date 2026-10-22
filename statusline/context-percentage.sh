@@ -15,6 +15,15 @@
 #   2. Offline fallback: a [1m] suffix => 1M; a built-in list of 1M-default
 #      models => 1M; everything else => 200k.
 #
+# Local mode (local-mode.sh: ANTHROPIC_BASE_URL is not Anthropic, e.g.
+# claude-local on Ollama): the window Claude Code reports assumes a Claude
+# model, so it is ignored. The window is the context length Ollama reports for
+# the loaded model (local-mode.sh caches it from /api/ps in the background),
+# else CLAUDE_CODE_MAX_CONTEXT_TOKENS, else the cached model DB entry for
+# ANTHROPIC_MODEL (as-is or ollama/-prefixed), else LOCAL_DEFAULT_WINDOW below. The token count is read as usual. The
+# background DB refresh is skipped when CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+# is set.
+#
 # Set USE_LIVE_WINDOWS=0 below to disable all network access (offline list only).
 #
 # Input: Claude Code's status JSON on stdin (context_window, or model.id + transcript_path).
@@ -24,11 +33,16 @@
 # /usr/bin (stat, date, cksum) on PATH.
 case "${OSTYPE:-}" in msys*|cygwin*) PATH="/usr/bin:$PATH" ;; esac
 
+. "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }
+export LOCAL=0 SERVER_JSON=""
+is_local_mode && LOCAL=1 && SERVER_JSON="$(local_server_json)"
+
 USE_LIVE_WINDOWS=1
 LITELLM_URL="https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 CACHE="/tmp/ccstatusline-model-windows-$(id -u).json"
 LOCK="/tmp/ccstatusline-model-windows-$(id -u).lock"
 MAX_AGE=86400   # refresh the window cache at most once per day
+export LOCAL_DEFAULT_WINDOW=32768   # local mode, when nothing else gives the window
 
 NODE="$(command -v node)"
 if [ -z "$NODE" ]; then printf 'Ctx: ?'; exit 0; fi
@@ -51,7 +65,7 @@ refresh_windows() {
   rm -f "$LOCK"
 }
 
-if [ "$USE_LIVE_WINDOWS" = "1" ]; then
+if [ "$USE_LIVE_WINDOWS" = "1" ] && ! { [ "$LOCAL" = "1" ] && [ -n "${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-}" ]; }; then
   STALE=0
   if [ ! -f "$CACHE" ]; then
     STALE=1
@@ -71,7 +85,26 @@ const modelId = (data && data.model && data.model.id ? String(data.model.id) : "
 const is1m = /\[1m\]/.test(modelId);
 
 const cw = (data && data.context_window) || {};
-let windowSize = Number(cw.context_window_size) || 0;
+const LOCAL = process.env.LOCAL === "1";
+let windowSize = LOCAL ? localWindow() : (Number(cw.context_window_size) || 0);
+
+// local mode: what Ollama serves, else CLAUDE_CODE_MAX_CONTEXT_TOKENS, else the cached model DB, else a default
+function localWindow() {
+  try {
+    const s = JSON.parse(process.env.SERVER_JSON);
+    if (s.state === "loaded" && s.ctx > 0) return s.ctx;
+  } catch (e) {}
+  const env = Number(process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS);
+  if (env > 0) return Math.floor(env);
+  const id = String(process.env.ANTHROPIC_MODEL || modelId).toLowerCase();
+  if (id && process.env.USE_LIVE === "1") {
+    try {
+      const map = JSON.parse(fs.readFileSync(process.env.CACHE, "utf8"));
+      for (const k of [id, "ollama/" + id, "ollama_chat/" + id]) if (map[k] > 0) return map[k];
+    } catch (e) {}
+  }
+  return Number(process.env.LOCAL_DEFAULT_WINDOW) || 32768;
+}
 
 // 1. cached LiteLLM window map (only when Claude Code did not report the window)
 if (!windowSize && process.env.USE_LIVE === "1") {
@@ -88,7 +121,7 @@ if (!windowSize) {
   windowSize = ONE_MILLION.some(m => modelId.indexOf(m) !== -1) ? 1000000 : 200000;
 }
 // a [1m] suffix always means the 1M beta, whatever the base entry says
-if (is1m && !cw.context_window_size) windowSize = 1000000;
+if (is1m && !cw.context_window_size && !LOCAL) windowSize = 1000000;
 
 // current context tokens: Claude Code reports them directly (current_usage);
 // older versions do not, so fall back to the last usage record in the transcript
