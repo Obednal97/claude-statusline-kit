@@ -20,7 +20,7 @@ native_path() { if [ "$IS_WINDOWS" = 1 ]; then cygpath -m "$1"; else printf '%s'
 CFG_DIR="$HOME_DIR/.config/ccstatusline"
 CLAUDE_SETTINGS="$HOME_DIR/.claude/settings.json"
 
-for f in daily-cost.sh weekly-cost.sh monthly-cost.sh context-percentage.sh account.sh repo-name.sh model-tags.sh plan-usage.sh model.sh session-cost.sh local-mode.sh local-speed.sh local-server.sh settings.json; do
+for f in daily-cost.sh weekly-cost.sh monthly-cost.sh context-percentage.sh account.sh repo-name.sh model-tags.sh plan-usage.sh model.sh session-cost.sh local-mode.sh local-speed.sh local-server.sh pr.sh settings.json; do
   rm -f "$CFG_DIR/$f"
 done
 say "Removed kit scripts + config from $CFG_DIR"

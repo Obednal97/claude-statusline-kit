@@ -61,3 +61,66 @@ class WidgetTest(unittest.TestCase):
         # Without COLORTERM it falls back to the 256-colour palette.
         self.assertEqual(rgb(0, {}), "\x1b[38;5;71")
         self.assertEqual(rgb(100, {}), "\x1b[38;5;203")
+
+
+@unittest.skipUnless(shutil.which("node") and shutil.which("bash"), "needs node and bash")
+class PrWidgetTest(unittest.TestCase):
+    """pr.sh shows the branch's PR/MR from Claude Code's own `pr` field: no gh/glab needed."""
+
+    def run_pr(self, payload):
+        p = subprocess.run(["bash", os.path.join(WIDGETS, "pr.sh")], env={"PATH": os.environ["PATH"]},
+                           input=json.dumps(payload), capture_output=True, text=True, timeout=30)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout
+
+    @staticmethod
+    def plain(s):
+        import re
+        return re.sub(r"\x1b\[[0-9;]*m|\x1b]8;;[^\x1b]*\x1b\\", "", s)
+
+    def test_hidden_without_a_pr(self):
+        self.assertEqual(self.run_pr({}), "")
+        self.assertEqual(self.run_pr({"pr": {}}), "")
+
+    def test_github_pr_is_a_clickable_number(self):
+        out = self.run_pr({"pr": {"number": 42, "url": "https://github.com/o/r/pull/42"}})
+        self.assertEqual(self.plain(out), "PR #42")
+        self.assertIn("\x1b]8;;https://github.com/o/r/pull/42\x1b\\", out)   # OSC 8 link open
+        self.assertTrue(out.endswith("\x1b]8;;\x1b\\") or out.endswith("\x1b[0m"), repr(out))
+
+    def test_gitlab_mr_uses_bang(self):
+        out = self.run_pr({"pr": {"number": 7, "url": "https://gitlab.com/o/r/-/merge_requests/7", "kind": "mr"}})
+        self.assertEqual(self.plain(out), "MR !7")
+
+    def test_review_state_is_shown(self):
+        pr = {"number": 42, "url": "https://github.com/o/r/pull/42"}
+        self.assertEqual(self.plain(self.run_pr({"pr": dict(pr, review_state="approved")})), "PR #42 ✓ approved")
+        self.assertEqual(self.plain(self.run_pr({"pr": dict(pr, review_state="changes_requested")})),
+                         "PR #42 ✗ changes requested")
+        self.assertEqual(self.plain(self.run_pr({"pr": dict(pr, review_state="draft")})), "PR #42 · draft")
+        self.assertEqual(self.plain(self.run_pr({"pr": dict(pr, review_state="pending")})), "PR #42")
+
+    def test_review_state_colours(self):
+        pr = {"number": 42, "url": "https://github.com/o/r/pull/42"}
+        self.assertIn("\x1b[32m", self.run_pr({"pr": dict(pr, review_state="approved")}))
+        self.assertIn("\x1b[31m", self.run_pr({"pr": dict(pr, review_state="changes_requested")}))
+        self.assertIn("\x1b[2m", self.run_pr({"pr": dict(pr, review_state="draft")}))
+
+
+@unittest.skipUnless(shutil.which("node") and shutil.which("bash"), "needs node and bash")
+class ModelTagsTest(unittest.TestCase):
+    def run_tags(self, payload):
+        p = subprocess.run(["bash", os.path.join(WIDGETS, "model-tags.sh")], env={"PATH": os.environ["PATH"]},
+                           input=json.dumps(payload), capture_output=True, text=True, timeout=30)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return p.stdout
+
+    def test_thinking_on_is_the_default_and_untagged(self):
+        self.assertEqual(self.run_tags({"effort": {"level": "high"}, "thinking": {"enabled": True}}),
+                         "\x1b[35m · high\x1b[0m")
+        self.assertEqual(self.run_tags({}), "\x1b[0m")   # never empty: it is a merged widget
+
+    def test_thinking_off_is_tagged(self):
+        self.assertEqual(self.run_tags({"thinking": {"enabled": False}}), "\x1b[35m · 💭off\x1b[0m")
+        self.assertEqual(self.run_tags({"effort": {"level": "max"}, "fast_mode": True, "thinking": {"enabled": False}}),
+                         "\x1b[35m · max ⚡fast 💭off\x1b[0m")

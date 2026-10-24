@@ -31,11 +31,11 @@ git diff --cached origin/main -U0 | grep '^+' | grep -inE '@gmail|/Users/|sk-ant
 - Windows editors save JSON with a BOM. Strip `^\uFEFF` before `JSON.parse` on any file a user may have edited.
 - ccstatusline renders spaces as U+00A0, so normalise them before grepping its output in tests.
 - `hide` metadata is a comma-separated string, e.g. `"hide": "no-git,no-data"`.
-- Git PR/branch-link widgets are built in (`git-pr`, `git-branch` with `"linkToRepo": "true"`); the PR widget fetches via `gh`/`glab` in the background, so it appears one render later.
+- The branch link is ccstatusline's built-in `git-branch` with `"linkToRepo": "true"`. The PR column is the kit's `pr.sh`, which reads Claude Code's `pr` field (`number`, `url`, `review_state`: approved/pending/changes_requested/draft, `kind`: `mr` for GitLab) instead of the built-in `git-pr`, which needs `gh`/`glab` and a background fetch.
 
 ## Testing
 
-Render against a sandbox instead of the live config: copy `statusline/*.sh` and `settings.json` into `$TMP/home/.config/ccstatusline/`, then `HOME=$TMP/home CLAUDE_CONFIG_DIR=<dir with a test .claude.json> ccstatusline < sample.json`. Under a fake `HOME`, `gh` loses its login — pass `GH_TOKEN=$(gh auth token)` for PR widgets.
+Render against a sandbox instead of the live config: copy `statusline/*.sh` and `settings.json` into `$TMP/home/.config/ccstatusline/`, then `HOME=$TMP/home CLAUDE_CONFIG_DIR=<dir with a test .claude.json> ccstatusline < sample.json`. Pass `CCSTATUSLINE_WIDTH=200` (ccstatusline honours it) when there is no terminal to measure, or every line is truncated.
 
 ## Rotation (`rotate/`)
 

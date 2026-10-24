@@ -140,11 +140,10 @@
       },
       {
         "id": "25",
-        "type": "git-pr",
-        "color": "brightBlack",
-        "metadata": {
-          "hide": "no-git,no-data,title"
-        }
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/pr.sh",
+        "preserveColors": true,
+        "timeout": 5000
       },
       {
         "id": "10",

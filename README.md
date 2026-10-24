@@ -10,16 +10,16 @@ Also included, and optional: a guide to separate work and personal Claude Code p
 
 ```
 Cost: $6.50 | Day: $18.40 | Wk: $92.10 | Mo: $412.75 | 5h: 62% ↻2h09m | 7d: 41% ↻Fri
-Model: Opus 5.5 · xhigh ⚡fast | Ctx: 24.3% (243k) | Session: 1h 12m
-claude-statusline-kit | ⎇ main | PR #42 OPEN | (+14,-3)
+Model: Opus 5.5 · xhigh ⚡fast 💭off | Ctx: 24.3% (243k) | Session: 1h 12m
+claude-statusline-kit | ⎇ main | PR #42 ✓ approved | (+14,-3)
 👤 you@example.com
 ```
 
 | Row | Shows |
 |-----|-------|
 | **1 — Money** | Session cost · today · week-to-date · month-to-date · on Pro/Max plans, 5-hour and weekly plan usage with time to reset (each fades from green through yellow to red as it fills). The plan usage is hidden on Team, Enterprise and API accounts. |
-| **2 — Context** | Model with reasoning effort and fast-mode tags · context window used (correct for 1M-context models) with live token count · session duration |
-| **3 — Git** | Repo name · branch (click to open it on GitHub/GitLab) · open PR/MR for the branch (click to open; needs the `gh` or `glab` CLI) · uncommitted changes. Hidden automatically when you're not in a repo. |
+| **2 — Context** | Model with reasoning effort, fast-mode and thinking-off tags · context window used (correct for 1M-context models) with live token count · session duration |
+| **3 — Git** | Repo name · branch (click to open it on GitHub/GitLab) · open PR/MR for the branch with its review state (click to open; read from Claude Code itself, no `gh`/`glab` needed) · uncommitted changes. Hidden automatically when you're not in a repo. |
 | **4 — Account** | The Claude account currently logged in (updates when you `/login`). Under `rclaude`, the account the session is really running on, including token accounts. Optional Work/Personal tag. |
 
 On a local model (Ollama and the like), rows 1, 2 and 4 switch to a local view, with speed and GPU stats in place of costs: see [Using a local model](#using-a-local-model-claude-local--ollama).
