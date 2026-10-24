@@ -361,6 +361,8 @@ class PresetRenderTest(unittest.TestCase):
 
     def render(self, settings, payload, env_extra):
         env = base_env(env_extra)
+        # the test runner has no terminal, so ccstatusline would otherwise pick a tiny width and truncate
+        env["CCSTATUSLINE_WIDTH"] = "200"
         cfg = os.path.join(env["HOME"], ".config", "ccstatusline")
         os.makedirs(cfg)
         for f in os.listdir(WIDGETS):
