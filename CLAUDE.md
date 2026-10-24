@@ -19,6 +19,8 @@ git diff --cached origin/main -U0 | grep '^+' | grep -inE '@gmail|/Users/|sk-ant
 
 ## ccstatusline quirks
 
+- `flexMode` is `full` (6 columns reserved). `full-minus-40` reserves 40 columns on every row before truncating, which on a 59-column phone terminal left 19 characters per row; the preset has no flex-separators, so the reservation bought nothing.
+
 - Custom-command output is trimmed, and colour/OSC 8 link escapes are stripped unless the widget has `"preserveColors": true` (then the script sets its own colours).
 - `"merge": true` goes on the widget that joins the *next* one. If the next widget prints nothing, the merge swallows the separator after it, so a merged script should print a bare `\x1b[0m` rather than nothing.
 - On Windows, custom commands run through `cmd.exe`, so `install.sh` rewrites each `~/.config/ccstatusline/*.sh` `commandPath` to `"<bash.exe>" "<abs path>"`. Keep new widget `commandPath`s in the `~/.config/ccstatusline/<name>.sh` form so that rewrite matches them.
