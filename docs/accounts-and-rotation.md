@@ -164,6 +164,8 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
   2. Run `CLAUDE_CONFIG_DIR=~/.claude-personal claude`, then `/login`, then `/exit`.
   3. Open a new session.
 - **Renew a token** (they last a year): `claude setup-token`, then `rclaude add-token <name>` again.
+  - Sessions already open on that account keep the token they started with. When the old token's next request fails to log in, `rclaude` restarts the session on the new token and resumes the conversation. It doesn't block the account.
+  - `add-token` also lifts a block that a login error left on the account, so the new token is tried at once. A block from a plan limit stays.
 - **Add an account:** add a tier to `accounts.json` with `"auth": "token"`, then run `rclaude add-token <name>`.
 - **Files:**
   - log: `~/.local/state/claude-rotate/rclaude.log`
@@ -175,6 +177,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 | You see | Do this |
 |---|---|
 | `rclaude: skipping spare (no token stored). Fix: rclaude add-token spare` | Run that command. |
+| `` rclaude: that looks cut short, or isn't a `claude setup-token` token …; nothing was saved. `` | The token wrapped onto a second line and only the first was pasted. Widen the terminal so `claude setup-token` prints it on one line (or join the two pieces), then run `rclaude add-token <name>` again. |
 | `rclaude: skipping main (main is logged in as …, expected …. Fix: …)` | Fix the login as above, outside running sessions. |
 | No switch when every account is limited | Expected: there's nowhere to switch to. `rclaude status` shows when each account resets. |
 | A switch takes a few seconds | Expected: `claude` restarts. Anything half-typed when a move-up happens at idle is lost. |

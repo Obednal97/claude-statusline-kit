@@ -8,7 +8,7 @@ import sys
 import time
 from typing import List, Optional
 
-from . import hooks, launcher, statusline, tokens
+from . import hooks, launcher, limits, statusline, tokens
 from .config import NAME_RE, ConfigError, load_config
 from .profiles import login_labels
 from .state import StateStore
@@ -72,7 +72,23 @@ def _add_token(args: List[str], store: StateStore) -> int:
         return 1
     print("Saved to %s" % tokens.describe(name))
     store.log("token stored for %s" % name)
+    if _clear_auth_block(store, name, time.time()):
+        print("Lifted the block on %s from its last login error; it's available again" % name)
+        store.log("auth block on %s lifted by add-token" % name)
     return 0
+
+
+def _clear_auth_block(store: StateStore, name: str, now: float) -> bool:
+    """Drop a block left by a login error (a bad token), so a new token is tried at once. A plan limit is kept:
+    a new token for the same account doesn't reset it. state.json records no kind, so the message tells them apart."""
+    with store.locked() as state:
+        acct = state["accounts"].get(name)
+        if not acct or float(acct.get("limited_until", 0) or 0) <= now:
+            return False
+        if limits.LIMIT_RE.search(str(acct.get("last_error") or "")):
+            return False
+        del acct["limited_until"]
+        return True
 
 
 def main(argv: List[str], entry_path: str) -> int:

@@ -14,6 +14,10 @@ from .config import NAME_RE
 
 SERVICE_PREFIX = "claude-rotate:"
 TOKEN_RE = re.compile(r"[A-Za-z0-9._~+/=-]+")  # always use .fullmatch
+SETUP_TOKEN_PREFIX = "sk-ant-oat01-"
+# Whole setup tokens are 107-108 characters (observed, not documented); one that wraps in the terminal gets pasted
+# cut at the wrap, e.g. 79-80 on an 80-column window. A floor with slack, not an exact length, so the format can change.
+SETUP_TOKEN_MIN_LEN = 96
 NOT_FOUND_EXIT = 44  # `security find-generic-password` exit status when there is no such item
 DEFAULT_TOKEN_FILE = "~/.config/claude-rotate/tokens.json"
 
@@ -103,6 +107,11 @@ def set_token(name: str, token: str) -> None:
         raise TokenStoreError("invalid tier name %r" % name)
     if not TOKEN_RE.fullmatch(token or ""):
         raise TokenStoreError("that doesn't look like a token (empty or unexpected characters); nothing was saved")
+    if not token.startswith(SETUP_TOKEN_PREFIX) or len(token) < SETUP_TOKEN_MIN_LEN:
+        raise TokenStoreError(
+            "that looks cut short, or isn't a `claude setup-token` token (those start %s); nothing was saved. "
+            "The token often wraps onto a second line and only the first gets pasted: widen the terminal so it "
+            "prints on one line, or join the pieces, then run rclaude add-token %s again" % (SETUP_TOKEN_PREFIX, name))
     path = token_file()
     if path is not None:
         data = _read_file(path)

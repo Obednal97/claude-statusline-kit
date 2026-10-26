@@ -79,6 +79,37 @@ class StopFailureTest(HookTestBase):
         self.assertEqual(self.store.read()["accounts"]["a"]["limited_until"], NOW + 3600)
         self.assertEqual(req["target"], "b")
 
+    def fail_on_token(self, running, stored, error="authentication_failed"):
+        env = dict(self.env("b"), CLAUDE_CODE_OAUTH_TOKEN=running)
+        payload = dict(FAILURE, error=error, last_assistant_message="Please run /login · API Error: 401")
+        with mock.patch.object(hooks.tokens, "get_token", return_value=stored):
+            return hooks.handle_stop_failure(payload, env, CONFIG, self.store, NOW, self.record)
+
+    def test_auth_error_on_a_replaced_token_relaunches_without_benching(self):
+        req = self.fail_on_token("tok-old", "tok-new")
+        self.assertEqual((req["reason"], req["from_account"], req["target"]), ("token-changed", "b", "b"))
+        self.assertEqual(self.kills, [self.pid])
+        self.assertNotIn("b", self.store.read()["accounts"])
+
+    def test_auth_error_on_the_stored_token_still_benches(self):
+        req = self.fail_on_token("tok-same", "tok-same")
+        self.assertEqual(self.store.read()["accounts"]["b"]["limited_until"], NOW + 3600)
+        self.assertEqual(req["reason"], "limit")
+
+    def test_token_store_error_still_benches(self):
+        env = dict(self.env("b"), CLAUDE_CODE_OAUTH_TOKEN="tok-old")
+        payload = dict(FAILURE, error="authentication_failed", last_assistant_message="401")
+        with mock.patch.object(hooks.tokens, "get_token", side_effect=hooks.tokens.TokenStoreError("locked")):
+            hooks.handle_stop_failure(payload, env, CONFIG, self.store, NOW, self.record)
+        self.assertEqual(self.store.read()["accounts"]["b"]["limited_until"], NOW + 3600)
+
+    def test_replaced_token_does_not_matter_for_a_plan_limit(self):
+        env = dict(self.env("b"), CLAUDE_CODE_OAUTH_TOKEN="tok-old")
+        with mock.patch.object(hooks.tokens, "get_token", return_value="tok-new") as get:
+            req = hooks.handle_stop_failure(dict(FAILURE), env, CONFIG, self.store, NOW, self.record)
+        self.assertEqual(req["reason"], "limit")
+        get.assert_not_called()
+
     def test_unusable_tiers_are_not_targets(self):
         self.seed(launcher={"account": "a", "unusable": ["b"]})
         self.assertEqual(self.fail()["target"], "work")
