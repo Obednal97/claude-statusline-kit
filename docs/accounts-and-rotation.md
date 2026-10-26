@@ -164,6 +164,8 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
   2. Run `CLAUDE_CONFIG_DIR=~/.claude-personal claude`, then `/login`, then `/exit`.
   3. Open a new session.
 - **Renew a token** (they last a year): `claude setup-token`, then `rclaude add-token <name>` again.
+  - Sessions already open on that account keep the token they started with. When the old token's next request fails to log in, `rclaude` restarts the session on the new token and resumes the conversation. It doesn't block the account.
+  - `add-token` also lifts a block that a login error left on the account, so the new token is tried at once. A block from a plan limit stays.
 - **Add an account:** add a tier to `accounts.json` with `"auth": "token"`, then run `rclaude add-token <name>`.
 - **Files:**
   - log: `~/.local/state/claude-rotate/rclaude.log`

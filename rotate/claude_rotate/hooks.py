@@ -9,6 +9,7 @@ import sys
 import time
 from typing import Callable, Mapping, Optional, Tuple
 
+from . import tokens
 from .config import Config
 from .limits import best_available, classify_failure, compute_limited_until, stop_decision
 from .profiles import profile_account
@@ -54,6 +55,19 @@ def logged_in_tier(config: Config, account: str) -> Optional[str]:
     return None
 
 
+def _token_replaced(config: Config, account: str, env: Mapping[str, str]) -> bool:
+    """Was a new token stored (`rclaude add-token`) after this token session started? Compared in memory only."""
+    tier = config.tier(account)
+    running = env.get("CLAUDE_CODE_OAUTH_TOKEN")
+    if tier is None or tier.auth != "token" or not running:
+        return False
+    try:
+        stored = tokens.get_token(account)
+    except tokens.TokenStoreError:
+        return False
+    return bool(stored) and stored != running
+
+
 def _record_session(state: dict, payload: dict, account: str, now: float) -> None:
     session_id = payload.get("session_id")
     if session_id:
@@ -77,6 +91,15 @@ def handle_stop_failure(payload: dict, env: Mapping[str, str], config: Config, s
     blame = logged_in_tier(config, account) if relogged else account
     if relogged:
         store.log("a /login happened inside this %s session; blaming %s" % (account, blame or "an account not in the config"))
+    if kind == "auth" and not relogged and _token_replaced(config, account, env):
+        # claude still runs on the token it was started with; relaunch on the stored one instead of benching.
+        if store.has_switch(pid):
+            return None
+        request = _request("token-changed", payload, account, account, now)
+        store.write_switch(pid, request)
+        killer(pid)
+        store.log("auth on %s with an old token; relaunching on the token stored since" % account)
+        return request
     with store.locked() as state:
         until = None
         if blame:

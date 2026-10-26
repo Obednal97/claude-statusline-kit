@@ -6,6 +6,7 @@ FAKE_CLAUDE_SCRIPT is a JSON list with one entry per invocation; each entry is a
   {"hook": "Stop" | "StopFailure", "payload": {...}} run that hook's commands with this JSON on stdin
   {"clear_limits": ["name", ...]}                    set limited_until = 0 (simulates a reset)
   {"append": {"path": ..., "rows": [...]}}          append JSON rows to a file (e.g. the transcript)
+  {"write_json": {"path": ..., "data": ...}}        replace a file with JSON (e.g. a token stored meanwhile)
   {"sleep": seconds}                                 pause
   {"snapshot_launchers": true}                      record rclaude's launcher entries as seen now
   {"touch": "/path"}                                 create a file (lets a test know we're running)
@@ -61,6 +62,9 @@ def main():
             with open(step["append"]["path"], "a") as f:
                 for row in step["append"]["rows"]:
                     f.write(json.dumps(row) + "\n")
+        elif "write_json" in step:
+            with open(step["write_json"]["path"], "w") as f:
+                json.dump(step["write_json"]["data"], f)
         elif "sleep" in step:
             time.sleep(step["sleep"])
         elif "snapshot_launchers" in step:

@@ -149,6 +149,25 @@ class IntegrationTest(unittest.TestCase):
         self.assertEqual(inv[1]["argv"][2:], ["--resume", "s1", "--dangerously-skip-permissions"])
         self.assertIn("rclaude add-token b", err)
 
+    def test_auth_error_after_add_token_relaunches_on_the_new_token(self):
+        # A token session keeps the token it started with; `rclaude add-token b` meanwhile doesn't reach it.
+        later = time.time() + 8 * 86400
+        h = Harness(state={"accounts": {"a": {"limited_until": later}, "work": {"limited_until": later}},
+                           "launchers": {}})
+        code, err, inv = h.run([], [
+            [{"write_json": {"path": h.token_file, "data": {"b": "tok-b-new"}}},
+             failure("s1", "Please run /login · API Error: 401 OAuth access token is invalid.",
+                     "authentication_failed"),
+             {"wait_for_term": True}],
+            [{"exit": 0}],
+        ])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(accounts(inv), ["b", "b"])
+        self.assertEqual(exit_codes(inv), [143, 0])
+        self.assertEqual([i["env"]["CLAUDE_CODE_OAUTH_TOKEN"] for i in inv], ["tok-b", "tok-b-new"])
+        self.assertEqual(inv[1]["argv"][2:], ["--resume", "s1"])  # no "different account" prompt: it isn't one
+        self.assertNotIn("limited_until", h.state()["accounts"].get("b", {}))
+
     def test_falls_to_work_with_handoff_when_personal_accounts_are_limited(self):
         h = Harness(state={"accounts": {"a": {"limited_until": time.time() + 3600}}, "launchers": {}})
         code, err, inv = h.run(["--add-dir", "../lib"], [[failure("s1"), {"wait_for_term": True}], [{"exit": 0}]])
