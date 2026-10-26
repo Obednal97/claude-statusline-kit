@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,6 +66,37 @@ class CliTest(unittest.TestCase):
         self.assertNotIn("secret_VALUE", out + err)
         with open(kc) as f:
             self.assertEqual(json.load(f), {"b": FULL_TOKEN})
+
+    def add_token_with_block(self, last_error, stdin=FULL_TOKEN + "\n"):
+        """Run add-token b with b blocked for a day after `last_error`; returns (code, out, b's state after)."""
+        state = tempfile.mkdtemp()
+        until = time.time() + 86400
+        with open(os.path.join(state, "state.json"), "w") as f:
+            json.dump({"accounts": {"b": {"limited_until": until, "last_error": last_error}},
+                       "launchers": {}, "sessions": {}}, f)
+        code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_TOKEN_FILE": os.path.join(state, "kc.json"),
+                                                           "RCLAUDE_CONFIG": self.config_file(),
+                                                           "RCLAUDE_STATE_DIR": state}, stdin=stdin)
+        with open(os.path.join(state, "state.json")) as f:
+            return code, out, json.load(f)["accounts"]["b"], until
+
+    def test_add_token_lifts_a_login_error_block(self):
+        code, out, acct, _ = self.add_token_with_block("Please run /login · API Error: 401 OAuth access token is invalid.")
+        self.assertEqual(code, 0)
+        self.assertIn("Lifted the block on b", out)
+        self.assertNotIn("limited_until", acct)
+
+    def test_add_token_keeps_a_plan_limit(self):
+        code, out, acct, until = self.add_token_with_block("You've hit your session limit · resets 3pm")
+        self.assertEqual(code, 0)
+        self.assertNotIn("Lifted", out)
+        self.assertEqual(acct["limited_until"], until)
+
+    def test_refused_token_keeps_the_block(self):
+        code, out, acct, until = self.add_token_with_block("Please run /login · API Error: 401",
+                                                           stdin=FULL_TOKEN[:80] + "\n")
+        self.assertEqual(code, 1)
+        self.assertEqual(acct["limited_until"], until)
 
     def test_add_token_refuses_the_first_line_of_a_wrapped_token(self):
         # getpass reads one line, so a token wrapped across two lines arrives cut at the wrap.
