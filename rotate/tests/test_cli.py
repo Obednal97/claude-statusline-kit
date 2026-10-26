@@ -13,6 +13,10 @@ CONFIG = {"tiers": [
 ]}
 
 
+# Shaped like a whole `claude setup-token` token; built so the public-repo scan stays clean.
+FULL_TOKEN = "sk-ant-oat01-" + "secret_VALUE" + "x" * 82  # 107, like a real one
+
+
 class CliTest(unittest.TestCase):
     def run_cli(self, args, env_extra=None, stdin=""):
         env = {"PATH": os.environ["PATH"], "HOME": tempfile.mkdtemp(), "USER": os.environ.get("USER", "test"),
@@ -55,12 +59,27 @@ class CliTest(unittest.TestCase):
         kc = os.path.join(tempfile.mkdtemp(), "kc.json")
         code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_TOKEN_FILE": kc,
                                                            "RCLAUDE_CONFIG": self.config_file()},
-                                      stdin="sk-ant-oat01-secret_VALUE\n")
+                                      stdin=FULL_TOKEN + "\n")
         self.assertEqual(code, 0, err)
         self.assertIn(kc + " (as b)", out)
         self.assertNotIn("secret_VALUE", out + err)
         with open(kc) as f:
-            self.assertEqual(json.load(f), {"b": "sk-ant-oat01-secret_VALUE"})
+            self.assertEqual(json.load(f), {"b": FULL_TOKEN})
+
+    def test_add_token_refuses_the_first_line_of_a_wrapped_token(self):
+        # getpass reads one line, so a token wrapped across two lines arrives cut at the wrap.
+        kc = os.path.join(tempfile.mkdtemp(), "kc.json")
+        code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_TOKEN_FILE": kc,
+                                                           "RCLAUDE_CONFIG": self.config_file()},
+                                      stdin=FULL_TOKEN[:80] + "\n" + FULL_TOKEN[80:] + "\n")
+        self.assertEqual(code, 1)
+        self.assertIn("cut short", err)
+        self.assertIn("nothing was saved", err)
+        self.assertIn("rclaude add-token b again", err)
+        self.assertNotIn("Saved", out)
+        self.assertNotIn("secret_VALUE", out + err)
+        self.assertNotIn("Traceback", err)
+        self.assertFalse(os.path.exists(kc))
 
     def test_failed_kill_drops_the_switch_request(self):
         state = tempfile.mkdtemp()

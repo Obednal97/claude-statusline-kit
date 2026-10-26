@@ -175,6 +175,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 | You see | Do this |
 |---|---|
 | `rclaude: skipping spare (no token stored). Fix: rclaude add-token spare` | Run that command. |
+| `` rclaude: that looks cut short, or isn't a `claude setup-token` token …; nothing was saved. `` | The token wrapped onto a second line and only the first was pasted. Widen the terminal so `claude setup-token` prints it on one line (or join the two pieces), then run `rclaude add-token <name>` again. |
 | `rclaude: skipping main (main is logged in as …, expected …. Fix: …)` | Fix the login as above, outside running sessions. |
 | No switch when every account is limited | Expected: there's nowhere to switch to. `rclaude status` shows when each account resets. |
 | A switch takes a few seconds | Expected: `claude` restarts. Anything half-typed when a move-up happens at idle is lost. |
