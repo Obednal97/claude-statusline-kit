@@ -144,7 +144,7 @@ Two kinds of "up to date", handled separately:
   ./update.sh          # git pull + re-run install.sh
   ```
 
-  Or manually: `git pull && ./install.sh`. The installer is idempotent and backs up anything it changes. If you installed rotation, `update.sh` refreshes it too.
+  Or manually: `git pull && ./install.sh`. The installer is idempotent and backs up anything it changes. If you installed rotation, `update.sh` refreshes it too; restart open `rclaude` sessions afterwards (`/exit`, then `rclaude --resume <session id>`), since each keeps the code it started with.
 
 ## How it works (and privacy)
 

@@ -259,6 +259,13 @@ class SessionStartTest(HookTestBase):
         self.assertEqual(self.store.read()["accounts"]["a"]["limited_until"], RESET)
         self.assertEqual(self.kills, [])
 
+    def test_limit_on_resume_is_not_asked_again_when_the_launcher_kept_the_account(self):
+        self.seed({}, {"account": "a", "launched_at": NOW - 2, "last_switch_at": NOW - 2, "started_at": NOW - 900,
+                       "last_request": {"from": "a", "target": "b", "at": NOW - 5}})
+        self.assertIsNone(self.start("a", write_transcript(org="org-a")))
+        self.assertEqual(self.kills, [])
+        self.assertEqual(self.store.read()["accounts"]["a"]["limited_until"], RESET)
+
 
 class LoginInsideSessionTest(HookTestBase):
     """A /login typed inside an rclaude session changes that session's account (and the profile's login).
@@ -442,3 +449,43 @@ class KillHelperTest(unittest.TestCase):
         self.assertIsNone(child.poll())
         self.assertTrue(hooks.delayed_kill(os.getpid(), child.pid, 0))
         self.assertEqual(child.wait(timeout=5), -15)
+
+
+class SwitchLoopGuardTest(HookTestBase):
+    """A launcher started before a code or config change still decides with what it loaded at startup. If it
+    relaunches on the account a hook just asked it to leave, asking again only loops: kill, relaunch, kill."""
+
+    def kept(self, account="a", target="b", launched_at=NOW - 2):
+        self.seed({}, {"account": account, "launched_at": launched_at, "last_switch_at": launched_at,
+                       "started_at": NOW - 900,
+                       "last_request": {"from": account, "target": target, "at": NOW - 5}})
+
+    def test_a_switch_request_is_remembered_on_the_launcher(self):
+        self.seed({}, {"account": "a", "launched_at": NOW - 900, "last_switch_at": 0, "started_at": NOW - 900})
+        hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record)
+        last = self.store.read()["launchers"][str(self.pid)]["last_request"]
+        self.assertEqual((last["from"], last["target"], last["at"]), ("a", "b", NOW))
+
+    def test_limit_is_not_asked_again_when_the_launcher_kept_the_account(self):
+        self.kept()
+        self.assertIsNone(hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record))
+        self.assertEqual(self.kills, [])
+        self.assertFalse(self.store.has_switch(self.pid))
+        self.assertGreater(self.store.read()["accounts"]["a"]["limited_until"], NOW)  # the limit is still recorded
+
+    def test_rebalance_is_not_asked_again_when_the_launcher_kept_the_account(self):
+        self.kept(account="b", target="a")
+        payload = {"session_id": "s1", "transcript_path": None, "cwd": "/w", "hook_event_name": "Stop"}
+        self.assertIsNone(hooks.handle_stop(payload, self.env("b"), CONFIG, self.store, NOW, self.record))
+        self.assertEqual(self.kills, [])
+
+    def test_a_request_not_yet_acted_on_does_not_count(self):
+        self.kept(launched_at=NOW - 900)  # the launcher has not relaunched since the request
+        self.assertIsNotNone(hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record))
+
+    def test_after_moving_away_and_back_requests_work_again(self):
+        self.kept()
+        with self.store.locked() as st:  # a -> b was honoured, and later b -> a
+            st["launchers"][str(self.pid)]["last_request"] = {"from": "b", "target": "a", "at": NOW - 5}
+        self.assertIsNotNone(hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record))
+
