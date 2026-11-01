@@ -45,6 +45,37 @@ def launched_since(launcher: dict) -> float:
     return max(float(launcher.get(k, 0) or 0) for k in ("launched_at", "last_switch_at", "started_at"))
 
 
+def launcher_kept(launcher: Mapping, account: str) -> Optional[dict]:
+    """The last switch request this launcher was sent, if it then relaunched on the account it was asked to leave.
+
+    A launcher decides where to go with the code and config it loaded when it started; hooks run the current ones.
+    After an update (or an accounts.json edit) the two can disagree, and asking again would only loop:
+    kill, relaunch on the same account, kill. Moving to any other account clears this, as the next request
+    then comes from that account."""
+    last = launcher.get("last_request")
+    if not isinstance(last, dict) or last.get("from") != account or last.get("target") == account:
+        return None
+    if launcher.get("account") != account or launched_since(launcher) <= float(last.get("at") or 0):
+        return None
+    return last
+
+
+def _log_kept(store: StateStore, account: str, last: Mapping) -> None:
+    store.log("launcher stayed on %s after being asked to move to %s; not asking again "
+              "(restart rclaude so it loads the current code and config)" % (account, last.get("target")))
+
+
+def _send_switch(store: StateStore, pid: int, request: dict) -> None:
+    store.write_switch(pid, request)
+    if request["target"] == request["from_account"]:
+        return  # a deliberate relaunch on the same account (new token, /login), not a move
+    with store.locked() as state:
+        launcher = state["launchers"].get(str(pid))
+        if launcher is not None:
+            launcher["last_request"] = {"from": request["from_account"], "target": request["target"],
+                                        "at": request["at"]}
+
+
 def logged_in_tier(config: Config, account: str) -> Optional[str]:
     """After a /login inside a session: the tier whose email matches the profile's login now, if any."""
     current = config.tier(account)
@@ -114,8 +145,10 @@ def handle_stop_failure(payload: dict, env: Mapping[str, str], config: Config, s
             until = acct["limited_until"]
         if blame:  # after a /login into an account no tier knows, record nothing rather than a wrong tier
             _record_session(state, payload, blame, now)
-        unusable = state["launchers"].get(str(pid), {}).get("unusable", [])
+        launcher = state["launchers"].get(str(pid), {})
+        unusable = launcher.get("unusable", [])
         target = best_available(config.tiers, state["accounts"], now, unusable)
+        kept = launcher_kept(launcher, account)
     if until:
         store.log("%s on %s (%s); limited until %s" % (
             kind, blame, message[:120], time.strftime("%a %H:%M", time.localtime(until))))
@@ -125,8 +158,11 @@ def handle_stop_failure(payload: dict, env: Mapping[str, str], config: Config, s
         return None
     if store.has_switch(pid):
         return None
+    if kept is not None:
+        _log_kept(store, account, kept)
+        return None
     request = _request("limit", payload, account, target.name, now)
-    store.write_switch(pid, request)
+    _send_switch(store, pid, request)
     killer(pid)
     store.log("switch requested: %s -> %s (limit)" % (account, target.name))
     return request
@@ -155,10 +191,14 @@ def handle_stop(payload: dict, env: Mapping[str, str], config: Config, store: St
             float(launcher.get("last_switch_at") or 0), config.min_upswitch_interval_seconds,
             launcher.get("unusable", []),
         )
+        kept = launcher_kept(launcher, account)
     if target is None:
         return None
+    if kept is not None:
+        _log_kept(store, account, kept)
+        return None
     request = _request("rebalance", payload, account, target.name, now)
-    store.write_switch(pid, request)
+    _send_switch(store, pid, request)
     killer(pid, payload.get("transcript_path"))
     store.log("switch requested: %s -> %s (rebalance at idle)" % (account, target.name))
     return request
@@ -196,15 +236,20 @@ def handle_session_start(payload: dict, env: Mapping[str, str], config: Config, 
         acct["limited_until"] = max(float(acct.get("limited_until", 0) or 0), found["resets_at"])
         acct["last_error"] = "resumed a conversation that ended on this account's usage limit"
         acct["last_error_at"] = now
-        unusable = state["launchers"].get(str(pid), {}).get("unusable", [])
+        launcher = state["launchers"].get(str(pid), {})
+        unusable = launcher.get("unusable", [])
         target = best_available(config.tiers, state["accounts"], now, unusable)
+        kept = launcher_kept(launcher, account)
     store.log("limit on %s found on resume; limited until %s" % (
         account, time.strftime("%a %H:%M", time.localtime(found["resets_at"]))))
     if target is None or target.name == account:
         store.log("no other account available; staying on %s (Claude Code's own wait applies)" % account)
         return None
+    if kept is not None:
+        _log_kept(store, account, kept)
+        return None
     request = _request("limit-on-resume", payload, account, target.name, now)
-    store.write_switch(pid, request)
+    _send_switch(store, pid, request)
     killer(pid)
     store.log("switch requested: %s -> %s (resumed into its own limit)" % (account, target.name))
     return request

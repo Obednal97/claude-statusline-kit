@@ -168,6 +168,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
   - Sessions already open on that account keep the token they started with. When the old token's next request fails to log in, `rclaude` restarts the session on the new token and resumes the conversation. It doesn't block the account.
   - `add-token` also lifts a block that a login error left on the account, so the new token is tried at once. A block from a plan limit stays.
 - **Add an account:** add a tier to `accounts.json` with `"auth": "token"`, then run `rclaude add-token <name>`.
+- **After editing `accounts.json` or updating the kit,** restart open `rclaude` sessions: `/exit`, then `rclaude --resume <session id>`. Each `rclaude` keeps the code and config it started with, while its hooks load the current ones. If the two disagree about where a session should go, the hooks ask once and then leave that session where it is (see Troubleshooting).
 - **Files:**
   - log: `~/.local/state/claude-rotate/rclaude.log`
   - state: `~/.local/state/claude-rotate/state.json`
@@ -181,6 +182,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 | `` rclaude: that looks cut short, or isn't a `claude setup-token` token …; nothing was saved. `` | The token wrapped onto a second line and only the first was pasted. Widen the terminal so `claude setup-token` prints it on one line (or join the two pieces), then run `rclaude add-token <name>` again. |
 | `rclaude: skipping main (main is logged in as …, expected …. Fix: …)` | Fix the login as above, outside running sessions. |
 | No switch when every account is limited | Expected: there's nowhere to switch to. `rclaude status` shows when each account resets. |
+| Log line `launcher stayed on <account> after being asked to move to <other>; not asking again` | That session's `rclaude` started before the kit was updated or `accounts.json` was edited, and still decides with the old version. `/exit`, then `rclaude --resume <session id>`. |
 | A switch takes a few seconds | Expected: `claude` restarts. Anything half-typed when a move-up happens at idle is lost. |
 
 ---

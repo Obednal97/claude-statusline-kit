@@ -60,6 +60,7 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
   - The status-line JSON has `rate_limits` (after the first API response) but no account identity.
   - The status-line JSON shows a window at 100% even while extra usage (usage credits) keeps the account working; it has no extra-usage field. Tiers opt in with `"extra_usage": true`.
   - The finished turn's own `assistant`/`user` rows are often flushed to the transcript only *after* the Stop hooks run. The idle-switch kill helper therefore ignores rows stamped before the hook ran; counting them made most switch-ups back off ("switch … dropped: claude was busy again").
+- Each `rclaude` launcher keeps the code and `accounts.json` it started with; hooks are new processes and load the current ones. The launcher picks the next account itself rather than taking the hook's `target`, so the two can disagree after an update or a config edit. That looped once (kill, relaunch on the same limited account, kill): `hooks.launcher_kept` now stops hooks re-asking a launcher that relaunched on the account it was asked to leave.
 - `launcher.py`'s option tables mirror `claude --help`; re-check them when Claude Code adds flags or subcommands.
 - Known gaps (from code review, not yet fixed):
   - A limit hit within ~1 s of an idle switch-up being queued gets no switch: the pending rebalance blocks the limit request, then backs off because the transcript grew. The next prompt switches normally.
