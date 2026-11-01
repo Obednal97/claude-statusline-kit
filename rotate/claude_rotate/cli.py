@@ -98,10 +98,14 @@ def main(argv: List[str], entry_path: str) -> int:
     if argv[:1] == ["_hook"] and len(argv) == 2 and argv[1] in ("stop", "stop-failure", "session-start"):
         return _hook(argv[1], store, entry_path)
     if argv[:1] == ["_kill"]:
-        if len(argv) in (3, 5) and argv[1].isdigit() and argv[2].isdigit():
-            transcript, size = (argv[3], int(argv[4])) if len(argv) == 5 and argv[4].isdigit() else (None, None)
+        if len(argv) in (3, 5, 6) and argv[1].isdigit() and argv[2].isdigit():
+            transcript, size = (argv[3], int(argv[4])) if len(argv) >= 5 and argv[4].isdigit() else (None, None)
+            try:
+                stopped_at = float(argv[5]) if len(argv) == 6 else None
+            except ValueError:
+                stopped_at = None
             killed = hooks.delayed_kill(int(argv[1]), int(argv[2]), float(os.environ.get("RCLAUDE_KILL_DELAY", "1.0")),
-                                        transcript, size, store)
+                                        transcript, size, store, stopped_at)
             if not killed:
                 store.take_switch(int(argv[1]))
                 store.log("switch for launcher %s dropped: claude was busy again or already gone" % argv[1])

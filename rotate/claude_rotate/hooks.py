@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime
 from typing import Callable, Mapping, Optional, Tuple
 
 from . import tokens
@@ -259,14 +260,25 @@ def schedule_kill(launcher_pid: int, entry_path: str, store: StateStore,
     cmd = [sys.executable, entry_path, "_kill", str(launcher_pid), str(child)]
     size = _size(transcript_path)
     if transcript_path and size is not None:
-        cmd += [transcript_path, str(size)]
+        cmd += [transcript_path, str(size), repr(time.time())]
     subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
 
 
-def _busy_since(transcript_path: str, size: int) -> bool:
+def _row_time(row: dict) -> Optional[float]:
+    stamp = row.get("timestamp")
+    if not isinstance(stamp, str):
+        return None
+    try:
+        return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _busy_since(transcript_path: str, size: int, stopped_at: Optional[float] = None) -> bool:
     """Did a new prompt or reply land after `size`? Claude Code always appends bookkeeping rows
-    (stop_hook_summary, turn_duration) after the Stop hooks; those don't count."""
+    (stop_hook_summary, turn_duration) after the Stop hooks; those don't count. Nor do rows stamped before
+    the Stop hook ran (`stopped_at`): Claude Code flushes the finished turn's own rows only after its hooks."""
     try:
         with open(transcript_path, "rb") as f:
             f.seek(size)
@@ -279,14 +291,18 @@ def _busy_since(transcript_path: str, size: int) -> bool:
         except ValueError:
             continue
         if isinstance(row, dict) and row.get("type") in ("user", "assistant"):
-            return True
+            at = _row_time(row) if stopped_at is not None else None
+            if at is None or at > stopped_at:
+                return True
     return False
 
 
 def delayed_kill(launcher_pid: int, child_pid: int, delay: float, transcript_path: Optional[str] = None,
-                 transcript_size: Optional[int] = None, store: Optional[StateStore] = None) -> bool:
+                 transcript_size: Optional[int] = None, store: Optional[StateStore] = None,
+                 stopped_at: Optional[float] = None) -> bool:
     time.sleep(delay)
-    if transcript_path is not None and transcript_size is not None and _busy_since(transcript_path, transcript_size):
+    if (transcript_path is not None and transcript_size is not None
+            and _busy_since(transcript_path, transcript_size, stopped_at)):
         return False  # the session got busy again (a blocking Stop hook, or the user typed)
     if parent_pid(child_pid) != launcher_pid:  # gone, or the PID was reused
         return False

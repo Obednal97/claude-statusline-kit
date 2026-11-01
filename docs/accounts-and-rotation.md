@@ -122,6 +122,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
    | `config_dir` | The profile to run in. Use `null` for the default profile, never `"~/.claude"`. |
    | `auth` | `"login"` (the profile's own login) or `"token"` (a token from step 3). |
    | `email` | Optional but recommended. Login accounts are checked against it at launch, so a profile logged into the wrong account is skipped. Token accounts show it in the status line. |
+   | `extra_usage` | Optional, default `false`. Set `true` for an account with extra usage (usage credits) turned on, which keeps working after its 5-hour or weekly usage shows 100%. `rclaude` then treats it as available until Claude Code actually stops it with a limit error (for example "You're out of extra usage"), so it's used once the accounts above it are limited. Leave it off for accounts where you don't want to spend credits. |
    | `min_upswitch_interval_seconds` | The minimum time between switches before moving back up (default 120). |
 
 5. **Aliases.** Add to your shell profile:

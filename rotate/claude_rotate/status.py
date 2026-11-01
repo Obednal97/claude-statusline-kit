@@ -45,10 +45,10 @@ def format_status(config: Config, state: Mapping, now: float, logins: Optional[M
         windows = [acct.get(w) if isinstance(acct.get(w), dict) else {} for w in WINDOWS]
         pct = ["%d%%" % round(w["pct"]) if "pct" in w else "-" for w in windows]
         seen = max(float(w.get("seen_at", 0) or 0) for w in windows)
-        ok = available(acct, now)
+        ok = available(acct, now, tier.extra_usage)
         rows.append((
             str(i), tier.name, "available" if ok else "limited", pct[0], pct[1],
-            "-" if ok else _when(blocked_until(acct, now), now), _age(seen, now), str(sessions.get(tier.name, 0)),
+            "-" if ok else _when(blocked_until(acct, now, tier.extra_usage), now), _age(seen, now), str(sessions.get(tier.name, 0)),
             (logins or {}).get(tier.name, "-"),
         ))
     widths = [max(len(r[c]) for r in rows) for c in range(len(rows[0]))]
