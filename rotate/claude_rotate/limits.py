@@ -109,22 +109,28 @@ def _window_blocks(win: object, now: float) -> bool:
             and float(win.get("resets_at", 0) or 0) > now)
 
 
-def available(acct: Mapping, now: float) -> bool:
+def available(acct: Mapping, now: float, extra_usage: bool = False) -> bool:
+    """With extra usage (usage credits), a window at 100% doesn't stop the account; only a limit error does."""
     if now < float(acct.get("limited_until", 0) or 0):
         return False
-    return not any(_window_blocks(acct.get(w), now) for w in WINDOWS)
+    return extra_usage or not any(_window_blocks(acct.get(w), now) for w in WINDOWS)
 
 
-def blocked_until(acct: Mapping, now: float) -> float:
+def blocked_until(acct: Mapping, now: float, extra_usage: bool = False) -> float:
     times = [float(acct.get("limited_until", 0) or 0)]
-    times += [float(acct[w]["resets_at"]) for w in WINDOWS if _window_blocks(acct.get(w), now)]
+    if not extra_usage:
+        times += [float(acct[w]["resets_at"]) for w in WINDOWS if _window_blocks(acct.get(w), now)]
     return max(times)
+
+
+def tier_available(tier: Tier, accounts: Mapping, now: float) -> bool:
+    return available(accounts.get(tier.name, {}), now, tier.extra_usage)
 
 
 def best_available(tiers: Sequence[Tier], accounts: Mapping, now: float,
                    unusable: Collection[str] = ()) -> Optional[Tier]:
     for t in tiers:
-        if t.name not in unusable and available(accounts.get(t.name, {}), now):
+        if t.name not in unusable and tier_available(t, accounts, now):
             return t
     return None
 
@@ -138,7 +144,7 @@ def pick(tiers: Sequence[Tier], accounts: Mapping, now: float,
     usable = [t for t in tiers if t.name not in unusable]
     if not usable:
         return None
-    return min(usable, key=lambda t: blocked_until(accounts.get(t.name, {}), now))  # min() keeps priority on ties
+    return min(usable, key=lambda t: blocked_until(accounts.get(t.name, {}), now, t.extra_usage))  # min() keeps priority on ties
 
 
 def _fresh_reset(acct: Mapping, window: str, now: float, full_only: bool) -> Optional[float]:
@@ -176,9 +182,10 @@ def stop_decision(tiers: Sequence[Tier], accounts: Mapping, current: str, now: f
     target = best_available(tiers, accounts, now, unusable)
     if target is None or target.name == current:
         return None
-    if current in unusable or not available(accounts.get(current, {}), now):
-        return target
     names = [t.name for t in tiers]
+    extra = current in names and tiers[names.index(current)].extra_usage
+    if current in unusable or not available(accounts.get(current, {}), now, extra):
+        return target
     current_index = names.index(current) if current in names else len(names)
     if names.index(target.name) < current_index and now - last_switch_at >= min_interval:
         return target

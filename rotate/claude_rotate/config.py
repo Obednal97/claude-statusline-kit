@@ -29,6 +29,7 @@ class Tier:
     config_dir: Optional[str]  # absolute path; None = default profile (CLAUDE_CONFIG_DIR unset)
     auth: str  # "login" or "token"
     email: Optional[str] = None  # expected account; login tiers are checked against their profile at launch
+    extra_usage: bool = False  # keeps working past 100% on usage credits: only a real limit error benches it
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,11 @@ def _parse_tier(raw: object, where: str, seen: set) -> Tier:
     email = raw.get("email")
     if email is not None and (not isinstance(email, str) or "@" not in email or not email.strip()):
         raise ConfigError("%s.email must be an email address" % where)
-    return Tier(name=name, config_dir=config_dir, auth=auth, email=email.strip() if email else None)
+    extra_usage = raw.get("extra_usage", False)
+    if not isinstance(extra_usage, bool):
+        raise ConfigError("%s.extra_usage must be true or false" % where)
+    return Tier(name=name, config_dir=config_dir, auth=auth, email=email.strip() if email else None,
+                extra_usage=extra_usage)
 
 
 def parse_config(data: object) -> Config:

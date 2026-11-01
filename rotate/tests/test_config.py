@@ -47,6 +47,15 @@ class ParseConfigTest(unittest.TestCase):
         self.assertEqual(cfg.tiers[0].email, "you@example.com")
         self.assertIsNone(cfg.tiers[1].email)
 
+    def test_optional_extra_usage_per_tier(self):
+        d = example()
+        d["tiers"][1]["extra_usage"] = True
+        cfg = parse_config(d)
+        self.assertEqual([t.extra_usage for t in cfg.tiers[:2]], [False, True])
+        for bad in ("yes", 1, None):
+            d["tiers"][1]["extra_usage"] = bad
+            self.assertInvalid(d, "extra_usage")
+
     def test_rejects_bad_email(self):
         for bad in ("not-an-email", 7, ""):
             d = example()

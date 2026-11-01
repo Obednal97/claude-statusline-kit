@@ -58,6 +58,8 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
   - Login sessions write a `credential_org` attachment after a prompt only when the org changes; token sessions write none.
   - An in-session `/login` appears in the transcript as a user entry starting `<local-command-stdout>Login successful`.
   - The status-line JSON has `rate_limits` (after the first API response) but no account identity.
+  - The status-line JSON shows a window at 100% even while extra usage (usage credits) keeps the account working; it has no extra-usage field. Tiers opt in with `"extra_usage": true`.
+  - The finished turn's own `assistant`/`user` rows are often flushed to the transcript only *after* the Stop hooks run. The idle-switch kill helper therefore ignores rows stamped before the hook ran; counting them made most switch-ups back off ("switch … dropped: claude was busy again").
 - `launcher.py`'s option tables mirror `claude --help`; re-check them when Claude Code adds flags or subcommands.
 - Known gaps (from code review, not yet fixed):
   - A limit hit within ~1 s of an idle switch-up being queued gets no switch: the pending rebalance blocks the limit request, then backs off because the transcript grew. The next prompt switches normally.

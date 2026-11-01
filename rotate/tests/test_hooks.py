@@ -411,6 +411,31 @@ class KillHelperTest(unittest.TestCase):
                 child.kill()
                 child.wait()
 
+    def test_the_turns_own_rows_flushed_after_the_stop_hook_do_not_block_the_kill(self):
+        # Claude Code 2.1.3xx writes the finished turn's assistant rows to disk only after the Stop hooks run;
+        # their timestamps are from before the hook, unlike a new prompt's.
+        stopped_at = 1793337600.0  # 2026-10-30T05:20:00Z
+        late = [{"type": "assistant", "timestamp": "2026-10-30T05:19:59.890Z", "message": {"content": "done"}},
+                {"type": "user", "timestamp": "2026-10-30T05:19:58.100Z", "message": {"content": []}}]
+        path, size = self.transcript_with(*late)
+        child = subprocess.Popen(["sleep", "30"])
+        self.assertTrue(hooks.delayed_kill(os.getpid(), child.pid, 0, path, size, stopped_at=stopped_at))
+        self.assertEqual(child.wait(timeout=5), -15)
+
+    def test_a_prompt_after_the_stop_hook_still_backs_off(self):
+        stopped_at = 1793337600.0
+        for row in ({"type": "user", "timestamp": "2026-10-30T05:20:03.000Z", "message": {"content": "next"}},
+                    {"type": "user", "message": {"content": "no timestamp: assume busy"}},
+                    {"type": "user", "timestamp": "garbage", "message": {"content": "unparseable: assume busy"}}):
+            path, size = self.transcript_with(row)
+            child = subprocess.Popen(["sleep", "30"])
+            try:
+                self.assertFalse(hooks.delayed_kill(os.getpid(), child.pid, 0, path, size, stopped_at=stopped_at))
+                self.assertIsNone(child.poll())
+            finally:
+                child.kill()
+                child.wait()
+
     def test_delayed_kill_only_hits_a_matching_child(self):
         child = subprocess.Popen(["sleep", "30"])
         self.assertFalse(hooks.delayed_kill(999999, child.pid, 0))

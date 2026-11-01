@@ -211,3 +211,32 @@ class StopDecisionTest(unittest.TestCase):
     def test_no_move_when_nothing_better_is_available(self):
         accounts = {n: {"limited_until": NOW + 600} for n in ("a", "b", "work")}
         self.assertIsNone(stop_decision(TIERS, accounts, "b", NOW, 0, 120))
+
+
+class ExtraUsageTest(unittest.TestCase):
+    """A tier with extra usage (usage credits) keeps working past 100%; only a real limit error benches it."""
+    WX = Tier("work", None, "token", extra_usage=True)
+    FULL = {"seven_day": {"pct": 100, "resets_at": NOW + 86400, "seen_at": NOW - 3600}}
+
+    def test_full_window_does_not_block_an_extra_usage_tier(self):
+        self.assertTrue(available(self.FULL, NOW, extra_usage=True))
+        self.assertFalse(available(self.FULL, NOW))
+
+    def test_a_real_limit_still_blocks_it(self):
+        acct = dict(self.FULL, limited_until=NOW + 600)
+        self.assertFalse(available(acct, NOW, extra_usage=True))
+        self.assertEqual(blocked_until(acct, NOW, extra_usage=True), NOW + 600)
+
+    def test_falls_back_to_it_when_the_personal_tiers_are_full(self):
+        tiers = (A, B, self.WX)
+        accounts = {"a": {"limited_until": NOW + 99999}, "b": {"limited_until": NOW + 9999}, "work": self.FULL}
+        self.assertEqual(best_available(tiers, accounts, NOW), self.WX)
+        self.assertEqual(pick(tiers, accounts, NOW), self.WX)
+
+    def test_moves_off_a_limited_tier_onto_it_and_back_up_later(self):
+        tiers = (A, B, self.WX)
+        accounts = {"a": {"limited_until": NOW + 99999}, "b": {"limited_until": NOW + 9999}, "work": self.FULL}
+        self.assertEqual(stop_decision(tiers, accounts, "a", NOW, 0, 120), self.WX)
+        self.assertIsNone(stop_decision(tiers, accounts, "work", NOW, 0, 120))  # stays: nothing better
+        accounts["b"] = {"limited_until": NOW - 1}
+        self.assertEqual(stop_decision(tiers, accounts, "work", NOW, 0, 120), B)
