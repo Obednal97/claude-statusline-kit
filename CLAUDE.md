@@ -1,6 +1,6 @@
 # Claude Code Statusline Kit
 
-A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.json`) plus custom-command widget scripts (`statusline/*.sh`). `install.sh` copies every `statusline/*.sh` and `settings.json` into `~/.config/ccstatusline/`; add new scripts to the file list in `uninstall.sh`. `rotate/` holds `rclaude`, an optional account-rotation launcher (Python), with its own installer; see the Rotation section.
+A [ccstatusline](https://github.com/sirmalloc/ccstatusline) preset (`settings.json`) plus custom-command widget scripts (`statusline/*.sh`). `install.sh` copies every `statusline/*.sh` and `settings.json` into `~/.config/ccstatusline/`; add new scripts to the file list in `uninstall.sh`. `settings.json` has exactly five rows (Money, Context, Git, Account, Device) and `install.sh` keeps those the user picks (`--rows`, a prompt in a terminal, else `~/.config/ccstatusline/kit-rows`); a new row means updating `ROW_NAMES`/`ROW_INFO` and the `5`s in `install.sh`. `rotate/` holds `rclaude`, an optional account-rotation launcher (Python), with its own installer; see the Rotation section.
 
 **This repo is public.** Never commit personal data: real emails, org IDs, employer names, home paths like `/Users/<name>`, Keychain item suffixes or tokens. Examples use `you@example.com`, `you.too@example.com` and `you@work.example`. Before committing, scan the added lines:
 
@@ -15,6 +15,7 @@ git diff --cached origin/main -U0 | grep '^+' | grep -inE '@gmail|/Users/|sk-ant
 - Scripts must never block a render: no network calls in the render path (background-refresh into a cache instead), and print nothing to hide the widget.
 - **Local mode** (a local or other non-Anthropic model, e.g. `claude-local` on Ollama): widgets source `statusline/local-mode.sh` (`is_local_mode`, `local_mode_ollama`; pure bash), with `. "${BASH_SOURCE[0]%/*}/local-mode.sh" 2>/dev/null || is_local_mode() { return 1; }`. In local mode the cost widgets print nothing and `local-speed.sh` (tok/s from the transcript, read incrementally) and `local-server.sh` (Ollama `/api/ps`, cached by a detached refresh in `local-mode.sh`; Ctx % uses its context length too) fill row 1; outside it they print nothing. Outside local mode every widget's output must stay byte-for-byte the same; `rotate/tests/test_local_mode.py` checks it, including a full ccstatusline render against the built-in widgets.
 - `model.sh` and `session-cost.sh` stand in for ccstatusline's built-in `model` and `session-cost` widgets so that local mode can change them. Outside local mode they copy the built-ins' output exactly; re-check against ccstatusline's source when upgrading it.
+- `device.sh` (row 5) reads the live machine, so `PresetRenderTest` drops it from both presets before comparing; test it with `STATUSLINE_DEVICE_SAMPLE` (`rotate/tests/test_device.py`). It must fit 53 columns (a 59-column phone terminal under `flexMode: full`) with every reading at 100%.
 - Account-specific files follow `CLAUDE_CONFIG_DIR` (`$CLAUDE_CONFIG_DIR/.claude.json`, else `~/.claude.json`). Read only identity/plan fields from `oauthAccount`; never touch credentials.
 
 ## ccstatusline quirks

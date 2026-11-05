@@ -21,7 +21,8 @@ else
 fi
 
 echo "==> Re-running installer…"
-./install.sh
+# Keep the rows chosen last time without asking (./install.sh on its own asks again).
+./install.sh </dev/null
 
 # Rotation (rclaude) is opt-in: refresh it only if it's installed from this checkout.
 ROTATE_ENTRY="$(cd "$REPO_DIR/rotate" && pwd -P)/rclaude"
