@@ -395,6 +395,10 @@ class PresetRenderTest(unittest.TestCase):
                     del w["commandPath"], w["timeout"]
                 kept.append(w)
             old["lines"][i] = kept
+        # The device row reads the live machine, so two renders differ: it has its own tests (test_device).
+        for preset in (old, new):
+            preset["lines"] = [line for line in preset["lines"]
+                               if not any(w.get("commandPath", "").endswith("/device.sh") for w in line)]
         return old, new
 
     def test_unchanged_outside_local_mode(self):
@@ -407,7 +411,8 @@ class PresetRenderTest(unittest.TestCase):
                 self.assertEqual(self.render(new, payload, env), self.render(old, payload, env), env)
 
     def test_local_render(self):
-        _, new = self.presets()
+        with open(os.path.join(KIT, "settings.json")) as f:
+            new = json.load(f)
         out = self.render(new, PAYLOAD, CLAUDE_LOCAL).replace(" ", " ")
         for gone in ["Cost:", "Day:", "Wk:", "Mo:", "5h:"]:
             self.assertNotIn(gone, out)
@@ -416,3 +421,5 @@ class PresetRenderTest(unittest.TestCase):
         self.assertIn("🖥 Local model (Ollama) · not using your Claude account", out)
         self.assertNotIn("5h:", out)
         self.assertNotIn("you@example.com", out)
+        # the device row stays in local mode
+        self.assertRegex(re.sub(r"\x1b\[[0-9;]*m", "", out), r"CPU [█░]{6} \d+% \| Mem")

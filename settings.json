@@ -166,6 +166,16 @@
         "color": "white",
         "timeout": 5000
       }
+    ],
+    [
+      {
+        "id": "30",
+        "type": "custom-command",
+        "commandPath": "~/.config/ccstatusline/device.sh",
+        "color": "white",
+        "timeout": 5000,
+        "preserveColors": true
+      }
     ]
   ],
   "flexMode": "full",
