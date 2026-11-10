@@ -66,7 +66,8 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 
 - `rclaude` runs `claude` with an extra settings file (`--settings`). That file adds:
   - a status-line recorder, which saves each account's 5-hour and weekly usage, then shows your normal status line with an `[account]` prefix;
-  - `Stop`, `StopFailure` and `SessionStart` hooks.
+  - `Stop`, `StopFailure` and `SessionStart` hooks;
+  - a `PostToolUse` hook on the Artifact tool, which records each artifact Claude publishes (see Artifacts on other accounts).
 
   Your own settings files are never edited.
 - **Moving down.** When a reply stops with "You've hit your … limit", the hook marks that account limited until its reset and stops `claude`. `rclaude` then starts it again on the next available account, with `--resume <session>` and a short "continue where you left off" prompt.
@@ -123,6 +124,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
    | `auth` | `"login"` (the profile's own login) or `"token"` (a token from step 3). |
    | `email` | Optional but recommended. Login accounts are checked against it at launch, so a profile logged into the wrong account is skipped. Token accounts show it in the status line. |
    | `extra_usage` | Optional, default `false`. Set `true` for an account with extra usage (usage credits) turned on, which keeps working after its 5-hour or weekly usage shows 100%. `rclaude` then treats it as available until Claude Code actually stops it with a limit error (for example "You're out of extra usage"), so it's used once the accounts above it are limited. Leave it off for accounts where you don't want to spend credits. |
+   | `share_artifacts` | Optional, default `true`. Set `false` to keep an account out of artifact sharing, for example a work organisation's account that must never mix with personal ones. Its artifacts are never flagged for sharing, and it is never suggested as an account to share with. |
    | `min_upswitch_interval_seconds` | The minimum time between switches before moving back up (default 120). |
 
 5. **Aliases.** Add to your shell profile:
@@ -153,6 +155,8 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 | `rclaude [claude options]` | An interactive session with rotation. Takes the same options as `claude`. |
 | `rclaude status` | Usage, limits, reset times, open sessions and logins for every account. |
 | `rclaude add-token <name>` | Store or replace a token (hidden input). |
+| `rclaude artifacts [--all]` | Artifacts published on an account other than the first and not yet shared (`--all`: every recorded artifact). |
+| `rclaude artifacts shared <number\|url\|all>` | Mark artifacts as shared once you've shared them. |
 | `rclaude mcp …`, `rclaude plugin …`, `rclaude auth …` | Run once on the first account's profile, with no rotation. |
 | `rclaude -p …` | Print mode, run once on the best available account, with no rotation. |
 
@@ -172,7 +176,25 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 - **Files:**
   - log: `~/.local/state/claude-rotate/rclaude.log`
   - state: `~/.local/state/claude-rotate/state.json`
+  - artifact record: `~/.local/state/claude-rotate/artifacts.jsonl`
   - config: `~/.config/claude-rotate/accounts.json`
+
+### Artifacts on other accounts
+
+An artifact that Claude publishes (Claude Code's Artifact tool) belongs to the account the session was running on, and only that account can open it until it's shared. There is no API for sharing, so `rclaude` keeps a record and makes the manual step quick:
+
+- Every successful publish is added to `~/.local/state/claude-rotate/artifacts.jsonl` (one JSON line each, readable only by you): link, title, account, project folder and session. Lists, reads and asset uploads aren't recorded.
+- When the account isn't your first one, Claude tells you in one line that the artifact isn't shared with your other accounts yet.
+- `rclaude artifacts` lists those artifacts by account, with the accounts to share each one with (and their emails, if `accounts.json` has them):
+  ```
+  spare: share with main (you@example.com)
+    3  Usage report  https://claude.ai/artifact/AbCdEf123  2h ago  my-project
+
+  Open each link signed in as its account, choose Share and add the accounts listed.
+  Then: rclaude artifacts shared <number|url|all>
+  ```
+- To share one: open the link in a browser signed in to claude.ai as the account shown, choose **Share**, and add your other accounts. Then run `rclaude artifacts shared 3` (or the link, or `all`).
+- Accounts with `"share_artifacts": false` are left out on both sides: their artifacts are recorded but never listed for sharing, and they're never suggested as somewhere to share to.
 
 ### Troubleshooting
 

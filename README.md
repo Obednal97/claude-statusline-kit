@@ -114,6 +114,8 @@ Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Co
 ./rotate/install.sh
 ```
 
+Artifacts that Claude publishes on an extra account are private to that account. `rclaude` records each one, and `rclaude artifacts` lists those still to share from claude.ai's Share menu (accounts set `"share_artifacts": false`, such as a work organisation, are left out). See [Artifacts on other accounts](docs/accounts-and-rotation.md#artifacts-on-other-accounts).
+
 Read [the guide](docs/accounts-and-rotation.md) first. It covers both profiles, the rotation setup, day-to-day use, and the risks: using several subscriptions to get past per-account limits may breach Anthropic's terms.
 
 ## Using a local model (claude-local / Ollama)

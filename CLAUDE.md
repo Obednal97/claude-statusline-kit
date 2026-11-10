@@ -51,6 +51,7 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
   - Tests must not depend on the local time zone or time of day: limit messages carry clock times (e.g. "resets 3:45pm"), so keep any competing reset far away (days), not hours.
 - Tokens never go on argv, in logs or in output. The Keychain is written through `security -i` on stdin; the Linux file store (`tokens.py`) is 0600 and replaced in one step.
 - Don't change the formats of `state.json`, switch files or the generated settings without a migration: sessions started from an older checkout share them.
+- `artifacts.jsonl` in the state dir is an append-only ledger (0600) that other tools read: `publish` lines (`t`, `url`, `id`, `title`, `account`, `main`, `session`, `cwd`, plus `share: false` for an account with `share_artifacts: false`) and `shared` lines (`t`, `url`). Readers fold by url and ignore unknown fields and events; keep those fields as they are.
 - Widgets learn about rclaude only through env: `RCLAUDE_ACCOUNT`, `RCLAUDE_AUTH` (`login`/`token`), `RCLAUDE_ACCOUNT_EMAIL`.
 - `rclaude` can be PID 1 in a container, so process-tree code must not treat PID 1 as "no launcher".
 - What the hooks rely on (checked against Claude Code 2.1.299):
@@ -60,6 +61,7 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
   - An in-session `/login` appears in the transcript as a user entry starting `<local-command-stdout>Login successful`.
   - The status-line JSON has `rate_limits` (after the first API response) but no account identity.
   - The status-line JSON shows a window at 100% even while extra usage (usage credits) keeps the account working; it has no extra-usage field. Tiers opt in with `"extra_usage": true`.
+  - The `PostToolUse` hook for the Artifact tool gets the call's `tool_input` and its result as `tool_response`, taken to be the object a transcript stores as `toolUseResult` (from transcripts of Claude Code 2.1.3xx, not yet a live hook capture): a page publish has `url`, `artifact_id`, `title`, `owned`; a publish from a type has `url` and `title` but no `artifact_id`; an asset upload (`asset: true`) has `asset_uploads`; a failure is a string starting `Error:`. `artifacts.published` also accepts the result as text ("Published … at <url> …").
   - The finished turn's own `assistant`/`user` rows are often flushed to the transcript only *after* the Stop hooks run. The idle-switch kill helper therefore ignores rows stamped before the hook ran; counting them made most switch-ups back off ("switch … dropped: claude was busy again").
 - Each `rclaude` launcher keeps the code and `accounts.json` it started with; hooks are new processes and load the current ones. The launcher picks the next account itself rather than taking the hook's `target`, so the two can disagree after an update or a config edit. That looped once (kill, relaunch on the same limited account, kill): `hooks.launcher_kept` now stops hooks re-asking a launcher that relaunched on the account it was asked to leave.
 - `launcher.py`'s option tables mirror `claude --help`; re-check them when Claude Code adds flags or subcommands.
