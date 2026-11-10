@@ -56,6 +56,25 @@ class CliTest(unittest.TestCase):
                                                   "RCLAUDE_CONFIG": "/nonexistent"}, stdin="{}")
         self.assertEqual(result, (0, "", ""))
 
+    def test_artifact_hook_records_and_tells_claude(self):
+        state = tempfile.mkdtemp()
+        payload = {"session_id": "s1", "cwd": "/w", "tool_name": "Artifact", "tool_input": {"file_path": "/p.html"},
+                   "tool_response": {"url": "https://claude.ai/artifact/AbC", "title": "Page", "owned": True}}
+        env = {"RCLAUDE_PID": "1", "RCLAUDE_ACCOUNT": "b", "RCLAUDE_CONFIG": self.config_file(),
+               "RCLAUDE_STATE_DIR": state}
+        code, out, err = self.run_cli(["_hook", "artifact"], env, stdin=json.dumps(payload))
+        self.assertEqual((code, err), (0, ""))
+        context = json.loads(out)["hookSpecificOutput"]
+        self.assertEqual(context["hookEventName"], "PostToolUse")
+        self.assertIn("account b", context["additionalContext"])
+        code, out, err = self.run_cli(["artifacts"], env)
+        self.assertEqual(code, 0, err)
+        self.assertIn("b: share with a, work", out)
+        self.assertIn("1  Page  https://claude.ai/artifact/AbC", out)
+        self.assertEqual(self.run_cli(["_hook", "artifact"], dict(env, RCLAUDE_ACCOUNT="a"),
+                                      stdin=json.dumps(payload)), (0, "", ""))
+        self.assertEqual(self.run_cli(["_hook", "from-a-newer-version"], env, stdin="{}"), (0, "", ""))
+
     def test_add_token_stores_without_echoing(self):
         kc = os.path.join(tempfile.mkdtemp(), "kc.json")
         code, out, err = self.run_cli(["add-token", "b"], {"RCLAUDE_TOKEN_FILE": kc,

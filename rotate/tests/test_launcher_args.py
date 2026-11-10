@@ -145,6 +145,8 @@ class GeneratedSettingsTest(unittest.TestCase):
                          "'/opt/my tools/rclaude' _hook stop-failure")
         self.assertEqual(s["hooks"]["SessionStart"][0]["hooks"][0]["command"],
                          "'/opt/my tools/rclaude' _hook session-start")
+        self.assertEqual(s["hooks"]["PostToolUse"], [{"matcher": "^Artifact$", "hooks": [
+            {"type": "command", "command": "'/opt/my tools/rclaude' _hook artifact"}]}])
 
 
 class PlanRelaunchTest(unittest.TestCase):

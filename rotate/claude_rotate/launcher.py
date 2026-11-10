@@ -142,13 +142,14 @@ def inner_statusline_for(tier: Tier) -> Optional[str]:
 def generated_settings(entry_path: str) -> dict:
     cmd = shlex.quote(entry_path)
 
-    def hook(command: str) -> list:
-        return [{"hooks": [{"type": "command", "command": command}]}]
+    def hook(command: str, **matcher: str) -> list:
+        return [dict(matcher, hooks=[{"type": "command", "command": command}])]
 
     return {
         "statusLine": {"type": "command", "command": cmd + " _statusline"},
         "hooks": {"Stop": hook(cmd + " _hook stop"), "StopFailure": hook(cmd + " _hook stop-failure"),
-                  "SessionStart": hook(cmd + " _hook session-start")},
+                  "SessionStart": hook(cmd + " _hook session-start"),
+                  "PostToolUse": hook(cmd + " _hook artifact", matcher="^Artifact$")},
     }
 
 

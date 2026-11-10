@@ -30,6 +30,7 @@ class Tier:
     auth: str  # "login" or "token"
     email: Optional[str] = None  # expected account; login tiers are checked against their profile at launch
     extra_usage: bool = False  # keeps working past 100% on usage credits: only a real limit error benches it
+    share_artifacts: bool = True  # false: kept out of artifact sharing (e.g. a work organisation)
 
 
 @dataclass(frozen=True)
@@ -76,8 +77,11 @@ def _parse_tier(raw: object, where: str, seen: set) -> Tier:
     extra_usage = raw.get("extra_usage", False)
     if not isinstance(extra_usage, bool):
         raise ConfigError("%s.extra_usage must be true or false" % where)
+    share_artifacts = raw.get("share_artifacts", True)
+    if not isinstance(share_artifacts, bool):
+        raise ConfigError("%s.share_artifacts must be true or false" % where)
     return Tier(name=name, config_dir=config_dir, auth=auth, email=email.strip() if email else None,
-                extra_usage=extra_usage)
+                extra_usage=extra_usage, share_artifacts=share_artifacts)
 
 
 def parse_config(data: object) -> Config:

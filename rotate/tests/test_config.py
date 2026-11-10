@@ -56,6 +56,13 @@ class ParseConfigTest(unittest.TestCase):
             d["tiers"][1]["extra_usage"] = bad
             self.assertInvalid(d, "extra_usage")
 
+    def test_optional_share_artifacts_per_tier(self):
+        d = example()
+        d["tiers"][1]["share_artifacts"] = False
+        self.assertEqual([t.share_artifacts for t in parse_config(d).tiers[:2]], [True, False])
+        d["tiers"][1]["share_artifacts"] = "no"
+        self.assertInvalid(d, "share_artifacts")
+
     def test_rejects_bad_email(self):
         for bad in ("not-an-email", 7, ""):
             d = example()

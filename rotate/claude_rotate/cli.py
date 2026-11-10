@@ -8,7 +8,7 @@ import sys
 import time
 from typing import List, Optional
 
-from . import hooks, launcher, limits, statusline, tokens
+from . import artifacts, hooks, launcher, limits, statusline, tokens
 from .config import NAME_RE, ConfigError, load_config
 from .profiles import login_labels
 from .state import StateStore
@@ -26,6 +26,11 @@ def _hook(event: str, store: StateStore, entry_path: str) -> int:
             payload = {}
         if not isinstance(payload, dict):
             payload = {}
+        if event == "artifact":
+            note = artifacts.handle_publish(payload, os.environ, config, store.dir, time.time())
+            if note:
+                print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": note}}))
+            return 0
 
         def killer(pid: int, transcript_path: Optional[str] = None) -> None:
             hooks.schedule_kill(pid, entry_path, store, transcript_path)
@@ -95,8 +100,9 @@ def main(argv: List[str], entry_path: str) -> int:
     store = StateStore()
     if argv[:1] == ["_statusline"]:
         return _statusline(store)
-    if argv[:1] == ["_hook"] and len(argv) == 2 and argv[1] in ("stop", "stop-failure", "session-start"):
-        return _hook(argv[1], store, entry_path)
+    if argv[:1] == ["_hook"]:  # an unknown hook (from a newer settings file) does nothing
+        known = len(argv) == 2 and argv[1] in ("stop", "stop-failure", "session-start", "artifact")
+        return _hook(argv[1], store, entry_path) if known else 0
     if argv[:1] == ["_kill"]:
         if len(argv) in (3, 5, 6) and argv[1].isdigit() and argv[2].isdigit():
             transcript, size = (argv[3], int(argv[4])) if len(argv) >= 5 and argv[4].isdigit() else (None, None)
@@ -120,5 +126,7 @@ def main(argv: List[str], entry_path: str) -> int:
     if argv[:1] == ["status"]:
         print(format_status(config, store.read(), time.time(), login_labels(config)))
         return 0
+    if argv[:1] == ["artifacts"]:
+        return artifacts.command(argv[1:], config, store.dir)
     return launcher.run(argv, config, store, entry_path,
                         claude_bin=os.environ.get("RCLAUDE_CLAUDE_BIN") or "claude")
