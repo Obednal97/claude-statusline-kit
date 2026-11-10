@@ -489,3 +489,46 @@ class SwitchLoopGuardTest(HookTestBase):
             st["launchers"][str(self.pid)]["last_request"] = {"from": "b", "target": "a", "at": NOW - 5}
         self.assertIsNotNone(hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record))
 
+
+
+class PinnedTest(HookTestBase):
+    """`rclaude --account`: the session stays on its account, whatever the limits."""
+
+    def env(self, account):
+        return dict(super().env(account), RCLAUDE_ACCOUNT_PIN=account)
+
+    def test_limit_is_recorded_but_never_moves(self):
+        self.seed({}, {"account": "a", "launched_at": NOW - 60, "pinned": True})
+        self.assertIsNone(hooks.handle_stop_failure(dict(FAILURE), self.env("a"), CONFIG, self.store, NOW, self.record))
+        self.assertGreater(self.store.read()["accounts"]["a"]["limited_until"], NOW)
+        self.assertEqual(self.kills, [])
+        self.assertFalse(self.store.has_switch(self.pid))
+
+    def test_no_move_up_at_idle(self):
+        self.seed({}, {"account": "work", "last_switch_at": 0, "pinned": True})  # a and b are free and higher
+        payload = {"session_id": "s2", "transcript_path": "/t/s2.jsonl", "cwd": "/w", "hook_event_name": "Stop"}
+        self.assertIsNone(hooks.handle_stop(payload, self.env("work"), CONFIG, self.store, NOW, self.record))
+        self.assertEqual(self.store.read()["sessions"]["s2"]["account"], "work")
+        self.assertEqual(self.kills, [])
+
+    def test_auth_error_on_a_replaced_token_still_relaunches_on_the_same_account(self):
+        env = dict(self.env("b"), CLAUDE_CODE_OAUTH_TOKEN="old")
+        with mock.patch.object(hooks.tokens, "get_token", return_value="new"):
+            req = hooks.handle_stop_failure(dict(FAILURE, error="authentication_failed"), env, CONFIG, self.store,
+                                            NOW, self.record)
+        self.assertEqual((req["reason"], req["target"]), ("token-changed", "b"))
+
+
+class PinnedResumeTest(HookTestBase):
+    def test_resuming_into_its_own_limit_marks_it_but_stays(self):
+        profile = tempfile.mkdtemp()
+        with open(os.path.join(profile, ".claude.json"), "w") as f:
+            json.dump({"oauthAccount": {"emailAddress": "a@x.com", "organizationUuid": "org-a"}}, f)
+        config = parse_config({"tiers": [{"name": "a", "config_dir": profile, "auth": "login", "email": "a@x.com"},
+                                         {"name": "b", "config_dir": profile, "auth": "token"}]})
+        payload = {"session_id": "s9", "transcript_path": write_transcript(org="org-a"), "cwd": "/w",
+                   "hook_event_name": "SessionStart", "source": "resume"}
+        env = dict(self.env("a"), RCLAUDE_ACCOUNT_PIN="a")
+        self.assertIsNone(hooks.handle_session_start(payload, env, config, self.store, NOW, self.record))
+        self.assertEqual(self.store.read()["accounts"]["a"]["limited_until"], RESET)
+        self.assertEqual(self.kills, [])

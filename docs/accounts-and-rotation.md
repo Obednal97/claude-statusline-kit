@@ -147,18 +147,30 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 - `[main?]` means the profile is now logged into a different account than `email` says (e.g. after a `/login`). Usage isn't recorded until that's fixed.
 - With this kit's status line, row 4 shows the email of the account in use, token accounts included.
 - If the profile has no status line, `rclaude` shows a one-line fallback, e.g. `[main] 5h 23% · wk 40%`.
+- `[work pinned]` is a session started with `--account` (below); `[work pinned, limited until Wed 15:37]` once that account hits a limit.
 
 ### Commands
 
 | Command | What it does |
 |---|---|
 | `rclaude [claude options]` | An interactive session with rotation. Takes the same options as `claude`. |
+| `rclaude --account <name\|number> [claude options]` | A session pinned to one account (see below). |
 | `rclaude status` | Usage, limits, reset times, open sessions and logins for every account. |
 | `rclaude add-token <name>` | Store or replace a token (hidden input). |
 | `rclaude artifacts [--all]` | Artifacts published on an account other than the first and not yet shared (`--all`: every recorded artifact). |
 | `rclaude artifacts shared <number\|url\|all>` | Mark artifacts as shared once you've shared them. |
 | `rclaude mcp …`, `rclaude plugin …`, `rclaude auth …` | Run once on the first account's profile, with no rotation. |
 | `rclaude -p …` | Print mode, run once on the best available account, with no rotation. |
+
+### Pin a session to one account
+
+`rclaude --account work` (or `--account 3`, the `#` column of `rclaude status`) starts on that account and never leaves it: no move down on a limit, no move up at idle. Use it for a work organisation that must not mix with personal accounts, or when you want a conversation on a particular account.
+
+- If the account is already limited, `rclaude` doesn't start, and says when it resets.
+- If it hits a limit mid-session, the session stays put: Claude Code shows its own limit message, and the status line shows `[work pinned, limited until …]`.
+- An unknown name or number lists the valid ones; a token account without a token says `Fix: rclaude add-token <name>`.
+- `rclaude status` counts pinned sessions, e.g. `1 (1 pinned)`. Restarts within the session (a new token, a `/login`) keep the pin.
+- `RCLAUDE_ACCOUNT_PIN=<name|number>` in the environment does the same; `--account` wins over it. `--account` is never passed to `claude`.
 
 ---
 

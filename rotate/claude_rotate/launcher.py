@@ -12,10 +12,10 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence, Set, TextI
 
 from . import tokens
 from .config import Config, Tier
-from .limits import best_available, pick
+from .limits import available, best_available, blocked_until, pick
 from .profiles import login_labels, login_mismatch
 from .state import StateStore
-from .status import format_status
+from .status import format_status, when
 
 # Option arities and subcommands as listed by `claude --help` in Claude Code 2.1.299.
 SUBCOMMANDS = frozenset({
@@ -45,7 +45,8 @@ DROP_ON_RELAUNCH = frozenset({
     "-w", "--worktree",
 })
 MANAGED_ENV = ("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN", "RCLAUDE_ACCOUNT", "RCLAUDE_PID",
-               "RCLAUDE_INNER_STATUSLINE", "RCLAUDE_AUTH", "RCLAUDE_ACCOUNT_EMAIL")
+               "RCLAUDE_INNER_STATUSLINE", "RCLAUDE_AUTH", "RCLAUDE_ACCOUNT_EMAIL", "RCLAUDE_ACCOUNT_PIN")
+ACCOUNT_USAGE = "usage: rclaude --account <name|number> [claude options]   (pins the session to that account)"
 LIMIT_PROMPT = ("You were interrupted by a usage limit and are now running on a different account. "
                 "Continue where you left off.")
 
@@ -107,8 +108,68 @@ def strip_session_args(args: Sequence[str]) -> List[str]:
     return out
 
 
+def take_account(args: Sequence[str]) -> Tuple[Optional[str], List[str]]:
+    """rclaude's own `--account <x>` / `--account=<x>` (never passed to claude), and the remaining args.
+    Returns ("", args) for `--account` without a value. Stops at `--` and skips other options' values."""
+    out: List[str] = []
+    pin: Optional[str] = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--":
+            out.extend(args[i:])
+            break
+        if a == "--account" or a.startswith("--account="):
+            if "=" in a:
+                pin = a.split("=", 1)[1]
+            elif i + 1 < len(args) and not args[i + 1].startswith("-"):
+                pin, i = args[i + 1], i + 1
+            else:
+                pin = ""
+            i += 1
+            continue
+        n = 2 if a in REQUIRED_VALUE else 1
+        out.extend(args[i:i + n])
+        i += n
+    return pin, out
+
+
+def find_tier(config: Config, key: str) -> Optional[Tier]:
+    """A tier by name, or by its 1-based number in `rclaude status`."""
+    tier = config.tier(key)
+    if tier is None and key.isdigit() and 1 <= int(key) <= len(config.tiers):
+        tier = config.tiers[int(key) - 1]
+    return tier
+
+
+def account_choices(config: Config) -> str:
+    return ", ".join("%d %s" % (i, t.name) for i, t in enumerate(config.tiers, 1))
+
+
+def pinned_problem(tier: Tier, accounts: Mapping, now: float, get_token: Callable[[str], Optional[str]],
+                   check_limit: bool = True) -> Tuple[Optional[str], Optional[str]]:
+    """(token, None) when the pinned tier can run now, else (None, the message to print)."""
+    problem = login_mismatch(tier)
+    if problem:
+        return None, "rclaude: can't use %s (%s)" % (tier.name, problem)
+    if check_limit and not available(accounts.get(tier.name, {}), now, tier.extra_usage):
+        return None, ("rclaude: %s is limited until %s. This session is pinned to it (--account), so rclaude won't "
+                      "move it to another account. Try again after the reset, or start without --account."
+                      % (tier.name, when(blocked_until(accounts.get(tier.name, {}), now, tier.extra_usage), now)))
+    if tier.auth != "token":
+        return None, None
+    try:
+        token = get_token(tier.name)
+        problem = "no token stored"
+    except tokens.TokenStoreError as e:
+        token, problem = None, "token store error: %s" % e
+    if token:
+        return token, None
+    return None, "rclaude: can't use %s (%s). Fix: rclaude add-token %s" % (tier.name, problem, tier.name)
+
+
 def build_env(base: Mapping[str, str], tier: Tier, token: Optional[str], launcher_pid: Optional[int] = None,
-              inner_statusline: Optional[str] = None) -> Dict[str, str]:
+              inner_statusline: Optional[str] = None, pinned: bool = False) -> Dict[str, str]:
     env = {k: v for k, v in base.items() if k not in MANAGED_ENV}
     if tier.config_dir:
         env["CLAUDE_CONFIG_DIR"] = tier.config_dir
@@ -120,6 +181,8 @@ def build_env(base: Mapping[str, str], tier: Tier, token: Optional[str], launche
         env["RCLAUDE_INNER_STATUSLINE"] = inner_statusline or ""
         env["RCLAUDE_AUTH"] = tier.auth  # status-line widgets: token sessions don't use the profile's login
         env["RCLAUDE_ACCOUNT_EMAIL"] = tier.email or ""
+        if pinned:
+            env["RCLAUDE_ACCOUNT_PIN"] = tier.name  # hooks never move a pinned session; the status line marks it
     return env
 
 
@@ -239,11 +302,19 @@ def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str,
     def warn(message: str) -> None:
         print(message, file=err)
 
+    pin_arg, argv = take_account(argv)
+    pin_key = environ.get("RCLAUDE_ACCOUNT_PIN", "") if pin_arg is None else pin_arg
+    pinned = find_tier(config, pin_key) if pin_key else None
+    if pinned is None and (pin_key or pin_arg is not None):
+        warn('rclaude: no account "%s".' % pin_key if pin_key else ACCOUNT_USAGE)
+        warn("Accounts (as in rclaude status): %s" % account_choices(config))
+        return 2
+
     unusable: Set[str] = set()
     if is_config_command(argv):
-        # `mcp add`, `plugin install`, `auth …` configure a profile: always the first tier's, never the
-        # work profile just because the personal accounts happen to be limited.
-        tier = config.tiers[0]
+        # `mcp add`, `plugin install`, `auth …` configure a profile: always the first tier's (or the pinned one's),
+        # never the work profile just because the personal accounts happen to be limited.
+        tier = pinned or config.tiers[0]
         token = None
         if tier.auth == "token":
             try:
@@ -252,6 +323,12 @@ def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str,
                 token = None
         return run_child([claude_bin] + list(argv), build_env(environ, tier, token))
     if is_passthrough(argv):
+        if pinned is not None:
+            token, problem = pinned_problem(pinned, store.read()["accounts"], now(), get_token)
+            if problem:
+                warn(problem)
+                return 1
+            return run_child([claude_bin] + list(argv), build_env(environ, pinned, token))
         tier, token = resolve_tier(config, store.read()["accounts"], now(), unusable, get_token, warn)
         if tier is None:
             warn("rclaude: no usable account.")
@@ -269,12 +346,23 @@ def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str,
     while True:
         t = now()
         accounts = store.read()["accounts"]
-        tier, token = resolve_tier(config, accounts, t, unusable, get_token, warn)
+        if pinned is not None:
+            # Never another account. Only the first launch checks the limit: a relaunch on the same account
+            # (new token, after a /login) resumes into Claude Code's own wait instead of ending the session.
+            tier = pinned
+            token, problem = pinned_problem(pinned, accounts, t, get_token, check_limit=current is None)
+            if problem:
+                warn(problem)
+                with store.locked() as state:
+                    state["launchers"].pop(key, None)
+                return 1
+        else:
+            tier, token = resolve_tier(config, accounts, t, unusable, get_token, warn)
         if tier is None:
             warn(format_status(config, store.read(), t, login_labels(config)))
             warn("rclaude: no usable account. Fix the problems above and try again.")
             return 1
-        if best_available(config.tiers, accounts, t, unusable) is None:
+        if pinned is None and best_available(config.tiers, accounts, t, unusable) is None:
             warn(format_status(config, store.read(), t, login_labels(config)))
             warn("rclaude: every account is limited; starting on %s, which resets soonest." % tier.name)
         if current is None or request is None:
@@ -287,9 +375,12 @@ def run(argv: Sequence[str], config: Config, store: StateStore, entry_path: str,
             entry = state["launchers"].setdefault(key, {"started_at": t, "last_switch_at": 0})
             entry.update({"account": tier.name, "cwd": os.getcwd(), "unusable": sorted(unusable),
                           "return_session": return_session, "launched_at": t})
+            if pinned is not None:
+                entry["pinned"] = True
             if current is not None:
                 entry["last_switch_at"] = t
-        env = build_env(environ, tier, token, launcher_pid=pid, inner_statusline=inner_statusline_for(tier))
+        env = build_env(environ, tier, token, launcher_pid=pid, inner_statusline=inner_statusline_for(tier),
+                        pinned=pinned is not None)
         store.log("launch on %s" % tier.name)
         code = run_child([claude_bin, "--settings", settings_path] + args, env)
         request = store.take_switch(pid)

@@ -187,3 +187,38 @@ class PlanRelaunchTest(unittest.TestCase):
     def test_missing_session_id(self):
         self.assertEqual(launcher.plan_relaunch({"reason": "limit"}, P, T, None), ([], None))
         self.assertEqual(launcher.plan_relaunch({"reason": "limit"}, P, W, None), ([], None))
+
+
+class AccountPinArgsTest(unittest.TestCase):
+    def test_takes_both_forms_and_keeps_the_rest_in_order(self):
+        self.assertEqual(launcher.take_account(["--account", "work", "--resume", "abc"]),
+                         ("work", ["--resume", "abc"]))
+        self.assertEqual(launcher.take_account(["--model", "opus", "--account=2", "hi"]), ("2", ["--model", "opus", "hi"]))
+        self.assertEqual(launcher.take_account(["hi"]), (None, ["hi"]))
+
+    def test_missing_value(self):
+        self.assertEqual(launcher.take_account(["--account"]), ("", []))
+        self.assertEqual(launcher.take_account(["--account", "--verbose"]), ("", ["--verbose"]))
+
+    def test_never_takes_a_value_or_anything_after_double_dash(self):
+        args = ["--append-system-prompt", "--account", "--", "--account", "x"]
+        self.assertEqual(launcher.take_account(args), (None, args))
+
+    def test_find_by_name_or_status_number(self):
+        from claude_rotate.config import Config
+        config = Config(tiers=(P, T, W), min_upswitch_interval_seconds=0)
+        self.assertIs(launcher.find_tier(config, "work"), W)
+        self.assertIs(launcher.find_tier(config, "2"), T)
+        for bad in ("0", "4", "nope"):
+            self.assertIsNone(launcher.find_tier(config, bad))
+        self.assertEqual(launcher.account_choices(config), "1 a, 2 b, 3 work")
+
+    def test_a_tier_named_like_a_number_wins_over_the_position(self):
+        from claude_rotate.config import Config
+        two = Tier("2", None, "login")
+        self.assertIs(launcher.find_tier(Config(tiers=(P, two), min_upswitch_interval_seconds=0), "2"), two)
+
+    def test_env_carries_the_pin_only_for_pinned_sessions(self):
+        base = {"RCLAUDE_ACCOUNT_PIN": "stale"}
+        self.assertEqual(launcher.build_env(base, W, None, launcher_pid=7, pinned=True)["RCLAUDE_ACCOUNT_PIN"], "work")
+        self.assertNotIn("RCLAUDE_ACCOUNT_PIN", launcher.build_env(base, W, None, launcher_pid=7))

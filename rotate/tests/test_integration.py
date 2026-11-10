@@ -363,3 +363,70 @@ class IntegrationTest(unittest.TestCase):
         _, err = proc.communicate(timeout=10)
         self.assertEqual(proc.returncode, 143, err)
         self.assertNotIn("Traceback", err)
+
+
+class AccountPinTest(unittest.TestCase):
+    """`rclaude --account <name|number>`: start on that account and never move."""
+
+    def test_starts_on_the_chosen_account_and_stays_through_a_limit(self):
+        h = Harness()
+        code, err, inv = h.run(["--account", "2", "--verbose"], [
+            [{"snapshot_launchers": True}, failure("s1"), stop("s1"), {"exit": 0}]])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(accounts(inv), ["b"])  # a was free and first, and stayed free
+        self.assertEqual(inv[0]["argv"][2:], ["--verbose"])  # --account is rclaude's, never claude's
+        self.assertEqual(inv[0]["env"]["RCLAUDE_ACCOUNT_PIN"], "b")
+        self.assertEqual([v.get("pinned") for v in inv[0]["launchers"].values()], [True])
+        self.assertGreater(h.state()["accounts"]["b"]["limited_until"], time.time())
+        self.assertFalse(any(n.startswith("switch-") for n in os.listdir(h.state_dir)))
+
+    def test_the_pin_survives_a_relaunch(self):
+        # A new token stored mid-session relaunches claude under the same launcher: still pinned, still b.
+        h = Harness()
+        code, err, inv = h.run(["--account", "b"], [
+            [{"write_json": {"path": h.token_file, "data": {"b": "tok-b-new"}}},
+             failure("s1", "Please run /login · API Error: 401 OAuth access token is invalid.", "authentication_failed"),
+             {"wait_for_term": True}],
+            [{"snapshot_launchers": True}, {"exit": 0}],
+        ])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(accounts(inv), ["b", "b"])
+        self.assertEqual([i["env"]["RCLAUDE_ACCOUNT_PIN"] for i in inv], ["b", "b"])
+        self.assertEqual(inv[1]["argv"][2:], ["--resume", "s1"])
+        self.assertEqual([v.get("pinned") for v in inv[1]["launchers"].values()], [True])
+
+    def test_env_pin_works_like_the_option(self):
+        h = Harness()
+        env = dict(h.env(), RCLAUDE_ACCOUNT_PIN="work")
+        h._json(h.script, [[{"exit": 0}]])
+        proc = subprocess.run([ENTRY], env=env, cwd=h.tmp, capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(accounts(h.invocations()), ["work"])
+
+    def test_a_limited_pinned_account_does_not_start(self):
+        h = Harness(state={"accounts": {"work": {"limited_until": time.time() + 8 * 86400}}, "launchers": {}})
+        code, err, inv = h.run(["--account=work"], [[{"exit": 0}]])
+        self.assertEqual((code, inv), (1, []))
+        self.assertIn("work is limited until", err)
+        self.assertIn("(in 7d", err)
+        self.assertEqual(h.state()["launchers"], {})
+
+    def test_unknown_account_lists_the_valid_ones(self):
+        h = Harness()
+        for args in (["--account", "nope"], ["--account", "9"], ["--account"]):
+            code, err, inv = h.run(args, [[{"exit": 0}]])
+            self.assertEqual((code, inv), (2, []), args)
+            self.assertIn("1 a, 2 b, 3 work", err)
+
+    def test_missing_token_says_how_to_fix_it(self):
+        h = Harness(tokens={})
+        code, err, inv = h.run(["--account", "b"], [[{"exit": 0}]])
+        self.assertEqual((code, inv), (1, []))
+        self.assertIn("Fix: rclaude add-token b", err)
+
+    def test_print_mode_runs_on_the_pinned_account(self):
+        h = Harness()
+        code, err, inv = h.run(["--account", "work", "-p", "hi"], [[{"exit": 0}]])
+        self.assertEqual(code, 0, err)
+        self.assertEqual(inv[0]["argv"], ["-p", "hi"])
+        self.assertIsNone(inv[0]["env"]["CLAUDE_CONFIG_DIR"])

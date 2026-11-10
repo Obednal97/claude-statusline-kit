@@ -5,8 +5,10 @@ import json
 import os
 import signal
 import subprocess
+import time
 from typing import Mapping
 
+from .limits import available, blocked_until
 from .profiles import login_mismatch
 from .state import StateStore
 from .transcript import login_since
@@ -76,6 +78,12 @@ def render(stdin_text: str, env: Mapping[str, str], store: StateStore, now: floa
         store.log("statusline: could not record usage: %r" % e)
     if mismatch:
         account += "?"  # the label no longer matches who is logged in
+    if env.get("RCLAUDE_ACCOUNT_PIN"):  # `rclaude --account`: it won't move, so say when a limit lifts
+        account += " pinned"
+        acct = store.read()["accounts"].get(env["RCLAUDE_ACCOUNT"], {})
+        extra = bool(tier and tier.extra_usage)
+        if not available(acct, now, extra):
+            account += ", limited until %s" % time.strftime("%a %H:%M", time.localtime(blocked_until(acct, now, extra)))
     inner = env.get("RCLAUDE_INNER_STATUSLINE") or ""
     if inner:
         try:

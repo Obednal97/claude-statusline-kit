@@ -28,6 +28,17 @@ def _context(env: Mapping[str, str]) -> Optional[Tuple[int, str]]:
     return int(pid), account
 
 
+def pinned(env: Mapping[str, str]) -> bool:
+    """Started with `rclaude --account`: the session stays on its account, limited or not."""
+    return bool(env.get("RCLAUDE_ACCOUNT_PIN"))
+
+
+def _stay_note(env: Mapping[str, str], account: str) -> str:
+    if pinned(env):
+        return "%s is pinned (--account); staying on it (Claude Code's own wait applies)" % account
+    return "no other account available; staying on %s (Claude Code's own wait applies)" % account
+
+
 def _request(reason: str, payload: dict, account: str, target: str, now: float) -> dict:
     return {
         "reason": reason,
@@ -147,14 +158,15 @@ def handle_stop_failure(payload: dict, env: Mapping[str, str], config: Config, s
             _record_session(state, payload, blame, now)
         launcher = state["launchers"].get(str(pid), {})
         unusable = launcher.get("unusable", [])
-        target = best_available(config.tiers, state["accounts"], now, unusable)
+        # Pinned: only ever the same account (a relaunch that undoes a /login), never another.
+        target = config.tier(account) if pinned(env) else best_available(config.tiers, state["accounts"], now, unusable)
         kept = launcher_kept(launcher, account)
     if until:
         store.log("%s on %s (%s); limited until %s" % (
             kind, blame, message[:120], time.strftime("%a %H:%M", time.localtime(until))))
     # After a /login, relaunching even on the same tier helps: it restores that tier's own credentials.
     if target is None or (target.name == account and not relogged):
-        store.log("no other account available; staying on %s (Claude Code's own wait applies)" % account)
+        store.log(_stay_note(env, account))
         return None
     if store.has_switch(pid):
         return None
@@ -186,7 +198,7 @@ def handle_stop(payload: dict, env: Mapping[str, str], config: Config, store: St
         if seen_as:
             _record_session(state, payload, seen_as, now)
         launcher = state["launchers"].get(str(pid), {})
-        target = stop_decision(
+        target = None if pinned(env) else stop_decision(
             config.tiers, state["accounts"], account, now,
             float(launcher.get("last_switch_at") or 0), config.min_upswitch_interval_seconds,
             launcher.get("unusable", []),
@@ -238,12 +250,12 @@ def handle_session_start(payload: dict, env: Mapping[str, str], config: Config, 
         acct["last_error_at"] = now
         launcher = state["launchers"].get(str(pid), {})
         unusable = launcher.get("unusable", [])
-        target = best_available(config.tiers, state["accounts"], now, unusable)
+        target = None if pinned(env) else best_available(config.tiers, state["accounts"], now, unusable)
         kept = launcher_kept(launcher, account)
     store.log("limit on %s found on resume; limited until %s" % (
         account, time.strftime("%a %H:%M", time.localtime(found["resets_at"]))))
     if target is None or target.name == account:
-        store.log("no other account available; staying on %s (Claude Code's own wait applies)" % account)
+        store.log(_stay_note(env, account))
         return None
     if kept is not None:
         _log_kept(store, account, kept)

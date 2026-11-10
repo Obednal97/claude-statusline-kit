@@ -38,3 +38,9 @@ class StatusTest(unittest.TestCase):
         self.assertEqual(w[:5], ["3", "work", "available", "-", "-"])
         self.assertIn("never", lines[3])
         self.assertEqual(w[-2:], ["0", "you@work.example"])
+
+    def test_pinned_sessions_are_counted(self):
+        state = {"accounts": {}, "launchers": {"1": {"account": "work", "pinned": True}, "2": {"account": "work"}}}
+        lines = format_status(CONFIG, state, NOW).splitlines()
+        self.assertIn("  2 (1 pinned)  ", lines[3])
+        self.assertNotIn("pinned", lines[1] + lines[2])

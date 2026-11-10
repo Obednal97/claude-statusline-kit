@@ -85,5 +85,12 @@ class StatuslineTest(unittest.TestCase):
         self.assertNotIn("a", self.store.read()["accounts"])
         self.assertTrue(out.startswith("[a?]"))
 
+    def test_pinned_account_is_marked_with_its_reset_while_limited(self):
+        self.assertEqual(self.render({}, RCLAUDE_ACCOUNT_PIN="a"), "[a pinned]")
+        with self.store.locked() as st:
+            st["accounts"]["a"] = {"limited_until": 900.0}
+        when = __import__("time").strftime("%a %H:%M", __import__("time").localtime(900.0))
+        self.assertEqual(self.render({}, RCLAUDE_ACCOUNT_PIN="a"), "[a pinned, limited until %s]" % when)
+
     def test_outside_rclaude_prints_nothing(self):
         self.assertEqual(statusline.render(json.dumps(PAYLOAD), {"PATH": "/bin"}, self.store, 1.0), "")

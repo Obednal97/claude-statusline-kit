@@ -108,7 +108,7 @@ The status line works in every profile: the cost widgets track each config dir s
 
 Sessions launched without `CLAUDE_CONFIG_DIR` count as one "default" account. Costs are split by config dir, not by login: switching accounts with `/login` inside the same dir, or rotating between accounts that share a profile, keeps a single combined total.
 
-**Several personal subscriptions?** The optional `rclaude` launcher (in `rotate/`) starts Claude Code on your first account. When that account hits a session or weekly limit, it relaunches the same conversation on the next account, and it moves back up when the higher account resets. macOS and Linux:
+**Several personal subscriptions?** The optional `rclaude` launcher (in `rotate/`) starts Claude Code on your first account. When that account hits a session or weekly limit, it relaunches the same conversation on the next account, and it moves back up when the higher account resets. `rclaude --account <name|number>` pins a session to one account instead (e.g. a work organisation), with no rotation. macOS and Linux:
 
 ```bash
 ./rotate/install.sh

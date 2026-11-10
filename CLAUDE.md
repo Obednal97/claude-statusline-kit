@@ -52,7 +52,8 @@ Render against a sandbox instead of the live config: copy `statusline/*.sh` and 
 - Tokens never go on argv, in logs or in output. The Keychain is written through `security -i` on stdin; the Linux file store (`tokens.py`) is 0600 and replaced in one step.
 - Don't change the formats of `state.json`, switch files or the generated settings without a migration: sessions started from an older checkout share them.
 - `artifacts.jsonl` in the state dir is an append-only ledger (0600) that other tools read: `publish` lines (`t`, `url`, `id`, `title`, `account`, `main`, `session`, `cwd`, plus `share: false` for an account with `share_artifacts: false`) and `shared` lines (`t`, `url`). Readers fold by url and ignore unknown fields and events; keep those fields as they are.
-- Widgets learn about rclaude only through env: `RCLAUDE_ACCOUNT`, `RCLAUDE_AUTH` (`login`/`token`), `RCLAUDE_ACCOUNT_EMAIL`.
+- Widgets learn about rclaude only through env: `RCLAUDE_ACCOUNT`, `RCLAUDE_AUTH` (`login`/`token`), `RCLAUDE_ACCOUNT_EMAIL`, and `RCLAUDE_ACCOUNT_PIN` (set only for `--account` sessions).
+- `--account <name|number>` (or `RCLAUDE_ACCOUNT_PIN` as input) pins a launcher: it always relaunches on that tier, refuses to start when the tier is limited, and records `"pinned": true` on its launcher entry (an added field; older code ignores it). Hooks read the pin from the env and never request a move for it, only same-account relaunches (new token, after a `/login`).
 - `rclaude` can be PID 1 in a container, so process-tree code must not treat PID 1 as "no launcher".
 - What the hooks rely on (checked against Claude Code 2.1.299):
   - `StopFailure` fires for every submitted prompt on a limited account, with `error: "rate_limit"` and the limit text in `last_assistant_message`.
