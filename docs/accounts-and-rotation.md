@@ -159,6 +159,7 @@ claude-squad starts the program you give it with `-p`. To keep the personal prof
 | `rclaude add-token <name>` | Store or replace a token (hidden input). |
 | `rclaude artifacts [--all]` | Artifacts published on an account other than the first and not yet shared (`--all`: every recorded artifact). |
 | `rclaude artifacts shared <number\|url\|all>` | Mark artifacts as shared once you've shared them. |
+| `rclaude models [--json] [--refresh]` | The models each account can use, newest first, read from Anthropic with that account's own login (plans differ, and `/model` shows only a few). Kept for 6 hours; a login account is read whenever its login is current, and its last list is kept otherwise. |
 | `rclaude mcp …`, `rclaude plugin …`, `rclaude auth …` | Run once on the first account's profile, with no rotation. |
 | `rclaude -p …` | Print mode, run once on the best available account, with no rotation. |
 

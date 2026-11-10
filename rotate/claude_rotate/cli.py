@@ -8,7 +8,7 @@ import sys
 import time
 from typing import List, Optional
 
-from . import artifacts, hooks, launcher, limits, statusline, tokens
+from . import artifacts, hooks, launcher, limits, models, statusline, tokens
 from .config import NAME_RE, ConfigError, load_config
 from .profiles import login_labels
 from .state import StateStore
@@ -128,5 +128,7 @@ def main(argv: List[str], entry_path: str) -> int:
         return 0
     if argv[:1] == ["artifacts"]:
         return artifacts.command(argv[1:], config, store.dir)
+    if argv[:1] == ["models"]:
+        return models.command(argv[1:], config, store.dir)
     return launcher.run(argv, config, store, entry_path,
                         claude_bin=os.environ.get("RCLAUDE_CLAUDE_BIN") or "claude")
